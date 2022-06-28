@@ -4,23 +4,24 @@ use std::net::SocketAddr;
 use warp::{self, Filter};
 
 use crate::handlers;
-use crate::models::Server;
+use crate::models::{Server, Configuration};
 
 /// All customer routes
 pub fn routes(
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     register_server()
-    .or(registration())
+    // .or(registration())
 }
 
-/// GET /register
-fn registration(
-) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::path("register")
-        .and(warp::get())
-        .and(with_route())
-        .and_then(handlers::registration_list)
-}
+// /// GET /register
+// fn registration(
+// ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+//     warp::path("register")
+//         .and(warp::get())
+//         .and(with_route())
+//         .and(with_config())
+//         .and_then(handlers::registration_list)
+// }
 
 /// POST /register
 fn register_server(
