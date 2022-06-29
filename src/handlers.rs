@@ -2,6 +2,7 @@
 use std::{convert::Infallible, net::SocketAddr};
 use std::env;
 use dotenv::dotenv;
+use uuid::Uuid;
 
 use warp::{self, http::StatusCode};
 use crate::models::{Server, IpResponse, Configuration};
@@ -50,10 +51,17 @@ pub async fn register_server(
             .send().await {
                 Ok(data) => {
                     if data.status().is_success() {
-                        let r = data.json::<IpResponse>().await;
+                        let r = match data.json::<IpResponse>().await {
+                            Ok(val) => val,
+                            Err(_) => {
+                                return Ok(Box::new(StatusCode::INTERNAL_SERVER_ERROR))
+                            }
+                        };
+
                         println!("{:?}", r);
 
                         // Assign a name; 
+                        let id = Uuid::new_v4();
 
                         let client = reqwest::Client::new();
 
@@ -66,7 +74,7 @@ pub async fn register_server(
                                 \"ttl\": 3600,
                                 \"priority\": 10,
                                 \"proxied\": false
-                            }}", "NAME", ip_addr))
+                            }}", format!("{}-{}.dns", r.country, id.to_string()), ip_addr))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
                             .send().await {
@@ -85,7 +93,7 @@ pub async fn register_server(
                                 \"ttl\": 3600,
                                 \"priority\": 10,
                                 \"proxied\": true
-                            }}", "NAME", ip_addr))
+                            }}", format!("{}-{}", r.country, id.to_string()), ip_addr))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
                             .send().await {
