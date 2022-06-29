@@ -35,6 +35,10 @@ fn with_config() -> Configuration {
     }
 }
 
+pub async fn echo() -> Result<impl warp::Reply, Infallible> {
+    Ok(Box::new(StatusCode::OK))
+}
+
 pub async fn register_server(
     ip: std::option::Option<SocketAddr>,
     authentication_key: Server,

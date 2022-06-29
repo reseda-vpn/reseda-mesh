@@ -10,7 +10,14 @@ use crate::models::{Server};
 pub fn routes(
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     register_server()
+    .or(response())
     // .or(registration())
+}
+
+fn response(
+) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
+    warp::path("")
+        .and_then(handlers::echo)
 }
 
 // /// GET /register
