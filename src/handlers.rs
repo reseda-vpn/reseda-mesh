@@ -1,11 +1,19 @@
 
 use std::{convert::Infallible, net::SocketAddr};
 use std::env;
+use dotenv::dotenv;
 
-use warp::{self, http::StatusCode, Filter};
+use warp::{self, http::StatusCode};
 use crate::models::{Server, IpResponse, Configuration};
 
 fn with_config() -> Configuration {
+    dotenv().expect(".env file not found");
+
+    println!("Environment Keys:");
+    for argument in env::args() {
+        println!("{}", argument);
+    }
+
     let authentication = match env::var("AUTHENTICATION_KEY") {
         Ok(val) => val,
         Err(_) => panic!("[err]: Environment variable: $AUTHENTICATION_KEY not set."),
@@ -104,13 +112,4 @@ pub async fn register_server(
             Ok(Box::new(StatusCode::INTERNAL_SERVER_ERROR))
         },
     }
-}
-
-pub async fn registration_list(
-    ip: std::option::Option<SocketAddr>
-) -> Result<impl warp::Reply, Infallible> {
-    println!("{:?}", ip);
-    
-
-    Ok(Box::new(StatusCode::NOT_FOUND))
 }

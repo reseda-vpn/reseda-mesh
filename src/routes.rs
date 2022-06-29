@@ -4,7 +4,7 @@ use std::net::SocketAddr;
 use warp::{self, Filter};
 
 use crate::handlers;
-use crate::models::{Server, Configuration};
+use crate::models::{Server};
 
 /// All customer routes
 pub fn routes(
