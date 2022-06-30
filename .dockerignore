@@ -1,0 +1,8 @@
+target/
+tests/
+Dockerfile
+scripts/
+migrations/
+.vscode
+todo.md 
+.env

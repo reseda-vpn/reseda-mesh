@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  reseda:
+    image: unrealgdev/reseda-mesh
+    container_name: reseda-mesh
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    ports:
+      - 8443:8443/udp
+      - 80:80
+      - 443:443
+    sysctls:
+      - net.ipv4.conf.all.src_valid_mark=1
+    restart: always
