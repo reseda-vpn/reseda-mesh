@@ -9,6 +9,8 @@ async fn main() {
     let routes = routes::routes();
 
     warp::serve(routes)
-        .run(([0, 0, 0, 0], 80))
-        .await;
+        .tls()
+        .cert_path("cert.pem")
+        .key_path("key.pem")
+        .run(([0, 0, 0, 0], 443)).await;
 }

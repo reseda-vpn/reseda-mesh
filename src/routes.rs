@@ -17,6 +17,7 @@ pub fn routes(
 fn response(
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
     warp::path::end()
+        .and(warp::get())
         .and_then(handlers::echo)
 }
 
