@@ -5,4 +5,3 @@ scripts/
 migrations/
 .vscode
 todo.md 
-.env
