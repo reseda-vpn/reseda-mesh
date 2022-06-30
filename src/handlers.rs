@@ -46,7 +46,16 @@ pub async fn register_server(
     let config = with_config();
 
     match ip {
-        Some(ip_addr) => {
+        Some(port_included_ip_addr) => {
+            let as_string = port_included_ip_addr.to_string();
+
+            let ip_addr = match as_string.split(':').nth(0) {
+                Some(val) => val,
+                None => {
+                    return Ok(Box::new(StatusCode::INTERNAL_SERVER_ERROR))
+                },
+            };
+
             println!("{:?} @ {:?}", authentication_key.auth, ip_addr);
 
             let client =  reqwest::Client::new();
