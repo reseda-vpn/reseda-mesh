@@ -51,6 +51,7 @@ RUN \
 
 COPY --from=builder /app/target/release/reseda-mesh ./app
 
+COPY .env ./app
 COPY cert.pem ./app
 COPY key.pem ./app
 
