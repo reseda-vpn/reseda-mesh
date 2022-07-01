@@ -113,7 +113,7 @@ pub async fn register_server(
                                 \"country\": \"{}\",
                                 \"hostname\": \"{}\",
                                 \"flag\": \"{}\",
-                                \"override\": true,
+                                \"override\": \"true\",
                             }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-")))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
