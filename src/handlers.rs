@@ -96,6 +96,15 @@ pub async fn register_server(
                                 },
                             };
                         
+                        println!("{{
+                            \"id\": \"{}\",
+                            \"location\": \"{}\",
+                            \"country\": \"{}\",
+                            \"hostname\": \"{}\",
+                            \"flag\": \"{}\",
+                            \"override\": true,
+                        }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-"));
+
                         match client.post("https://reseda.app/api/server/register")
                             .body(format!("
                             {{
