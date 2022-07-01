@@ -73,7 +73,6 @@ pub async fn register_server(
 
                         println!("{:?}", r);
 
-                        // Assign a name; 
                         let id = Uuid::new_v4();
 
                         let client = reqwest::Client::new();
@@ -82,31 +81,31 @@ pub async fn register_server(
                             .body(format!("
                             {{
                                 \"type\": \"A\",
-                                \"name\": \"{}.dns\",
-                                \"content\": \"{}\",
+                                \"name\": \"{}\",
+                                \"content\": \"{}.dns\",
                                 \"ttl\": 3600,
                                 \"priority\": 10,
-                                \"proxied\": false
-                            }}", format!("{}-{}.dns", r.country, id.to_string()), ip_addr))
+                                \"proxied\": true
+                            }}", format!("{}-{}", r.country, id.to_string()), ip_addr))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
                             .send().await {
                                 Ok(_) => {},
                                 Err(err) => {
-                                    panic!("[err]: Error in setting non-proxied DNS {}", err)
+                                    panic!("[err]: Error in setting proxied DNS {}", err)
                                 },
-                            }
-
-                        match client.post("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
+                            };
+                        
+                        match client.post("https://reseda.app/api/server/register")
                             .body(format!("
                             {{
-                                \"type\": \"A\",
-                                \"name\": \"{}\",
-                                \"content\": \"{}\",
-                                \"ttl\": 3600,
-                                \"priority\": 10,
-                                \"proxied\": true
-                            }}", format!("{}-{}", r.country, id.to_string()), ip_addr))
+                                \"id\": \"{}\",
+                                \"location\": \"{}\",
+                                \"country\": \"{}\",
+                                \"hostname\": \"{}\",
+                                \"flag\": \"{}\",
+                                \"override\": true,
+                            }}", id.to_string(), r.timezone, r.city, r.city.to_lowercase().replace(" ", "-"), ip_addr))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
                             .send().await {
