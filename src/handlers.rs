@@ -105,13 +105,15 @@ pub async fn register_server(
                                 \"hostname\": \"{}\",
                                 \"flag\": \"{}\",
                                 \"override\": true,
-                            }}", id.to_string(), r.timezone, r.city, r.city.to_lowercase().replace(" ", "-"), ip_addr))
+                            }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-")))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
                             .send().await {
-                                Ok(_) => {},
+                                Ok(res) => {
+                                    println!("Reseda Returned: {:?}", res.text().await);
+                                },
                                 Err(err) => {
-                                    panic!("[err]: Error in setting proxied DNS {}", err)
+                                    panic!("[err]: Error in registering server; {}", err)
                                 },
                             };
 
