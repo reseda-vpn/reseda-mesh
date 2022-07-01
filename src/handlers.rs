@@ -95,17 +95,7 @@ pub async fn register_server(
                                     panic!("[err]: Error in setting proxied DNS {}", err)
                                 },
                             };
-                        
-                        println!("{{
-                            \"id\": \"{}\",
-                            \"location\": \"{}\",
-                            \"country\": \"{}\",
-                            \"hostname\": \"{}\",
-                            \"virtual\": \"false\",
-                            \"flag\": \"{}\",
-                            \"override\": \"true\"
-                        }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-"));
-
+                    
                         match client.post("https://reseda.app/api/server/register")
                             .body(format!("
                             {{
@@ -115,7 +105,7 @@ pub async fn register_server(
                                 \"hostname\": \"{}\",
                                 \"virtual\": \"false\",
                                 \"flag\": \"{}\",
-                                \"override\": \"true\"
+                                \"override\": \"false\"
                             }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-")))
                             .header("Content-Type", "application/json")
                             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
