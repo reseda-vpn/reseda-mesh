@@ -8,7 +8,7 @@ pub struct Server {
     pub auth: String
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Serialize)]
 pub struct IpResponse {
     pub country: String,
     pub region: String,
@@ -26,4 +26,13 @@ pub struct Configuration {
     pub check_key: String,
     pub cloudflare_key: String,
     pub database_key: String
+}
+
+#[derive(Serialize)]
+pub struct RegistryReturn {
+    pub key: String,
+    pub cert: String,
+    pub ip: String,
+    pub res: IpResponse,
+    pub id: String
 }
