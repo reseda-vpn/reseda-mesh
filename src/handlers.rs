@@ -116,7 +116,9 @@ pub async fn register_server(
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
-            Ok(_) => {},
+            Ok(return_val) => {
+                println!("{:?}", return_val);
+            },
             Err(err) => {
                 panic!("[err]: Error in setting proxied DNS {}", err)
             },
