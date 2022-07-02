@@ -149,10 +149,7 @@ pub async fn register_server(
     let cert_private = cert.serialize_private_key_pem();
     let cert_string = cert_public.replace("\r", "").split("\n").collect::<Vec<&str>>().join("\\n");
 
-    let mut cert = "".to_string();
-    let mut key = "".to_string();
-
-    let (cert, key)  = match client.post("https://api.cloudflare.com/client/v4/certificates")
+    let (cert, key) = match client.post("https://api.cloudflare.com/client/v4/certificates")
         .body(format!("
         {{
             \"hostnames\": [
@@ -166,12 +163,13 @@ pub async fn register_server(
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
             Ok(response) => {
+                // println!("{:?}", response.text().await);
                 let r = response.json::<CloudflareReturn>().await;
 
                 match r {
                     Ok(return_value) => {
                         if return_value.success == false {
-                            println!("[err]: cloudlfare certificate creation FAILED, return value FAILURE. Reason: {:?}", return_value);
+                            println!("[err]: cloudflare certificate creation FAILED, return value FAILURE. Reason: {:?}", return_value);
                         }
 
                         (return_value.result.certificate, cert_private)
