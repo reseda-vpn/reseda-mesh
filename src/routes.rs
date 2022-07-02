@@ -34,7 +34,7 @@ fn response(
 /// POST /register
 fn register_server(
 ) -> impl Filter<Extract = impl warp::Reply, Error = warp::Rejection> + Clone {
-    warp::path("register")
+    warp::path!("register" / String)
         .and(warp::post())
         .and(with_route())
         .and(json_body())

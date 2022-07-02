@@ -55,30 +55,15 @@ pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
 }
 
 pub async fn register_server(
+    ip: String,
     ip_a: std::option::Option<SocketAddr>,
     authentication_key: Server,
 ) -> Result<Box<dyn warp::Reply>, Infallible> {
     let config = with_config();
 
-    let ip = match ip_a {
-        Some(val) => val,
-        None => {
-            return Ok(Box::new(StatusCode::INTERNAL_SERVER_ERROR))
-        }
-    };
-
-    let as_str = ip.to_string();
-
-    let ip_addr = match as_str.split(':').nth(0) {
-        Some(val) => val,
-        None => {
-            return Ok(Box::new(StatusCode::INTERNAL_SERVER_ERROR))
-        },
-    };
-
     let client =  reqwest::Client::new();
 
-    let data = match client.get(format!("https://ipgeolocationapi.co/v1/{}", ip_addr))
+    let data = match client.get(format!("https://ipgeolocationapi.co/v1/{}", ip))
     .send().await {
         Ok(data) => data,
         Err(_) => {
@@ -112,7 +97,7 @@ pub async fn register_server(
             \"ttl\": 3600,
             \"priority\": 10,
             \"proxied\": true
-        }}", format!("{}-{}", r.country, id.to_string()), ip_addr))
+        }}", format!("{}-{}", r.country, id.to_string()), ip))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
@@ -134,7 +119,7 @@ pub async fn register_server(
             \"virtual\": \"false\",
             \"flag\": \"{}\",
             \"override\": \"false\"
-        }}", id.to_string(), r.timezone, r.city, ip_addr, r.city.to_lowercase().replace(" ", "-")))
+        }}", id.to_string(), r.timezone, r.city, ip, r.city.to_lowercase().replace(" ", "-")))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
@@ -191,7 +176,7 @@ pub async fn register_server(
     let rr = RegistryReturn {
         cert: cert,
         key: key,
-        ip: ip_addr.to_string(),
+        ip: ip,
         id: id.to_string(),
         res: r
     };
