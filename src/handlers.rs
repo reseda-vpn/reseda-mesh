@@ -107,8 +107,8 @@ pub async fn register_server(
         .body(format!("
         {{
             \"type\": \"A\",
-            \"name\": \"{}\",
-            \"content\": \"{}.dns\",
+            \"name\": \"{}.dns\",
+            \"content\": \"{}\",
             \"ttl\": 3600,
             \"priority\": 10,
             \"proxied\": true
