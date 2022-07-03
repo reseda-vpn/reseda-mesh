@@ -1,12 +1,11 @@
 
 use std::{convert::Infallible};
-use std::env;
-use dotenv::dotenv;
 use serde::Deserialize;
 use uuid::Uuid;
 
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
+use crate::Mesh;
 use crate::models::{Server, IpResponse, Configuration, RegistryReturn};
 use rcgen::generate_simple_self_signed;
 
@@ -21,34 +20,6 @@ pub struct CloudflareResult {
     pub certificate: String
 }
 
-pub fn with_config() -> Configuration {
-    dotenv().expect(".env file not found");
-
-    println!("Environment Keys:");
-    for argument in env::args() {
-        println!("{}", argument);
-    }
-
-    let authentication = match env::var("AUTHENTICATION_KEY") {
-        Ok(val) => val,
-        Err(_) => panic!("[err]: Environment variable: $AUTHENTICATION_KEY not set."),
-    };
-    let cloudflare = match env::var("CLOUDFLARE_KEY") {
-        Ok(val) => val,
-        Err(_) => panic!("[err]: Environment variable: $CLOUDFLARE_KEY not set."),
-    };
-    let database = match env::var("DATABASE_KEY") {
-        Ok(val) => val,
-        Err(_) => panic!("[err]: Environment variable: $DATABASE_KEY not set."),
-    };
-
-    Configuration {
-        check_key: authentication,
-        cloudflare_key: cloudflare,
-        database_key: database
-    }
-}
-
 pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
     Ok(Box::new(StatusCode::OK))
 }
@@ -56,10 +27,9 @@ pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
 pub async fn register_server(
     ip: String,
     authentication_key: Server,
+    configuration: Mesh
 ) -> Result<Box<dyn warp::Reply>, Infallible> {
-    let config = with_config();
-
-    if authentication_key.auth != config.check_key {
+    if authentication_key.auth != configuration.lock().await.keys.check_key {
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
@@ -101,7 +71,7 @@ pub async fn register_server(
             \"proxied\": true
         }}", format!("{}-{}", r.country, id.to_string()), ip))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", config.cloudflare_key))
+        .header("Authorization", format!("Bearer {}",  configuration.lock().await.keys.cloudflare_key))
         .send().await {
             Ok(return_val) => {
                 println!("{:?}", return_val);
@@ -121,9 +91,8 @@ pub async fn register_server(
             \"virtual\": \"false\",
             \"flag\": \"{}\",
             \"override\": \"false\"
-        }}", format!("{}-{}", r.country, id.to_string()), r.timezone, r.city, ip, r.city.to_lowercase().replace(" ", "-")))
+        }}", format!("{}-{}", r.country, id.to_string()), r.timezone, r.timezone.split("/").collect::<Vec<&str>>()[1], ip, r.country.to_lowercase().replace(" ", "-")))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
             Ok(res) => {
                 println!("Reseda Returned: {:?}", res.text().await);
@@ -149,7 +118,7 @@ pub async fn register_server(
             \"csr\": \"{}\"
         }}", format!("{}-{}", r.country, id.to_string()), cert_string))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", config.cloudflare_key))
+        .header("Authorization", format!("Bearer {}", configuration.lock().await.keys.cloudflare_key))
         .send().await {
             Ok(response) => {
                 // println!("{:?}", response.text().await);

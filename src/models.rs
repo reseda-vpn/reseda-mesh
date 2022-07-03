@@ -1,6 +1,7 @@
-use std::os::raw::c_float;
+use std::{os::raw::c_float, sync::Arc, collections::HashMap};
 
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 
 /// Represents a customer
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -35,4 +36,10 @@ pub struct RegistryReturn {
     pub ip: String,
     pub res: IpResponse,
     pub id: String
+}
+
+pub type Stack = Arc<Mutex<HashMap<String, Node>>>;
+
+pub struct Node {
+    pub hostname: String
 }
