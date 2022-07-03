@@ -63,6 +63,20 @@ RUN echo "#!/bin/bash\n" \
 RUN chmod +x script.sh
 RUN ./script.sh
 
+ARG cert
+
+RUN echo "#!/bin/bash\n" \
+         "  echo -e \"$cert" > ./app/cert.pem\n"  > certificate_script.sh
+RUN chmod +x certificate_script.sh
+RUN ./certificate_script.sh
+
+ARG key
+
+RUN echo "#!/bin/bash\n" \
+         "  echo -e \"$key" > ./app/key.pem\n"  > key_script.sh
+RUN chmod +x key_script.sh
+RUN ./key_script.sh
+
 EXPOSE 8443/udp
 EXPOSE 80
 EXPOSE 443
