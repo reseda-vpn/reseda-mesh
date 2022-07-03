@@ -1,11 +1,10 @@
 
-use std::{convert::Infallible, net::SocketAddr};
+use std::{convert::Infallible};
 use std::env;
 use dotenv::dotenv;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use warp::body::json;
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
 use crate::models::{Server, IpResponse, Configuration, RegistryReturn};
@@ -56,10 +55,13 @@ pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
 
 pub async fn register_server(
     ip: String,
-    ip_a: std::option::Option<SocketAddr>,
     authentication_key: Server,
 ) -> Result<Box<dyn warp::Reply>, Infallible> {
     let config = with_config();
+
+    if authentication_key.auth != config.check_key {
+        return Ok(Box::new(StatusCode::FORBIDDEN))
+    }
 
     let client =  reqwest::Client::new();
 
@@ -119,7 +121,7 @@ pub async fn register_server(
             \"virtual\": \"false\",
             \"flag\": \"{}\",
             \"override\": \"false\"
-        }}", id.to_string(), r.timezone, r.city, ip, r.city.to_lowercase().replace(" ", "-")))
+        }}", format!("{}-{}", r.country, id.to_string()), r.timezone, r.city, ip, r.city.to_lowercase().replace(" ", "-")))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
@@ -145,7 +147,7 @@ pub async fn register_server(
             \"requested_validity\": 5475,
             \"request_type\": \"origin-rsa\",
             \"csr\": \"{}\"
-        }}", id.to_string(), cert_string))
+        }}", format!("{}-{}", r.country, id.to_string()), cert_string))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", config.cloudflare_key))
         .send().await {
@@ -177,7 +179,7 @@ pub async fn register_server(
         cert: cert,
         key: key,
         ip: ip,
-        id: id.to_string(),
+        id: format!("{}-{}", r.country, id.to_string()),
         res: r
     };
 
