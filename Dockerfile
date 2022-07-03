@@ -51,9 +51,17 @@ RUN \
 
 COPY --from=builder /app/target/release/reseda-mesh ./app
 
-COPY .env ./app
 COPY cert.pem ./app
 COPY key.pem ./app
+
+ARG mesh_key
+ARG db_key
+ARG cloudflare_key
+
+RUN echo "#!/bin/bash\n" \
+         "  echo -e \"DATABASE_KEY='$db_key'\AUTHENTICATION_KEY='$mesh_key'\CLOUDFLARE_KEY='$cloudflare_key'" > ./app/.env\n"  > script.sh
+RUN chmod +x script.sh
+RUN ./script.sh
 
 EXPOSE 8443/udp
 EXPOSE 80
