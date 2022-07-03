@@ -21,7 +21,7 @@ jobs:
       uses: actions/checkout@v3
     - 
       name: Build the Docker image
-      run: docker build . -t unrealgdev/reseda-mesh:latest --build-arg db_key=${{ secrets.DATABASE_URL }} --build-arg mesh_key=${{ secrets.MESH_KEY }} --build-arg cloudflare_key=${{ secrets.CLOUDFLARE_KEY }} --build-arg cert=${{ secrets.CERTIFICATE }}  --build-arg key=${{ secrets.KEY }}
+      run: docker build . -t unrealgdev/reseda-mesh:latest --build-arg db_key=${{ secrets.DATABASE_URL }} --build-arg mesh_key=${{ secrets.MESH_KEY }} --build-arg cloudflare_key=${{ secrets.CLOUDFLARE_KEY }}
     -
       name: Push the Docker image
       run: docker push unrealgdev/reseda-mesh:latest

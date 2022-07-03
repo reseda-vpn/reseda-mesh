@@ -11,17 +11,17 @@ use crate::models::{Server, IpResponse, Configuration, RegistryReturn};
 use rcgen::generate_simple_self_signed;
 
 #[derive(Deserialize, Debug)]
-struct CloudflareReturn {
+pub struct CloudflareReturn {
     pub success: bool,
     pub result: CloudflareResult
 }
 
 #[derive(Deserialize, Debug)]
-struct CloudflareResult {
+pub struct CloudflareResult {
     pub certificate: String
 }
 
-fn with_config() -> Configuration {
+pub fn with_config() -> Configuration {
     dotenv().expect(".env file not found");
 
     println!("Environment Keys:");
