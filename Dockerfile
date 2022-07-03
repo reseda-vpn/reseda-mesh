@@ -51,9 +51,6 @@ RUN \
 
 COPY --from=builder /app/target/release/reseda-mesh ./app
 
-COPY cert.pem ./app
-COPY key.pem ./app
-
 ARG mesh_key
 ARG db_key
 ARG cloudflare_key
