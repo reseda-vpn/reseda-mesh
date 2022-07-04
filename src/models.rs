@@ -1,4 +1,4 @@
-use std::{os::raw::c_float, sync::Arc, collections::HashMap};
+use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, default};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -39,7 +39,31 @@ pub struct RegistryReturn {
 }
 
 pub type Stack = Arc<Mutex<HashMap<String, Node>>>;
-
 pub struct Node {
-    pub hostname: String
+    /// This row is all the information exclusively accessible known by the server that was initialized. 
+    /// Note, we need to ensure this is all valid and correct, justified and all...
+    pub information: RegistryReturn,
+    pub state: NodeState
+}
+
+pub enum NodeState {
+    Online,
+    Offline,
+    Booting
+}
+
+/// For queueing tasks.
+pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
+
+/// Relative to the server, task to manage or migrate server items, dynamically created as threads with the multi threaded locked storage.
+pub enum TaskType {
+    CheckStatus,
+    Instantiate,
+    Dismiss
+}
+
+pub struct Task {
+    task_type: TaskType,
+    action_object: Node,
+
 }

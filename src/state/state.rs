@@ -1,20 +1,26 @@
 use dotenv::dotenv;
 use rcgen::generate_simple_self_signed;
 use sqlx::{Pool, MySql, mysql::MySqlPoolOptions};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::{env, sync::Arc};
 use std::fs::File;
 use std::io::Write;
 use tokio::sync::Mutex;
+use reqwest::Client;
 
+use crate::models::TaskQueue;
 use crate::{models::{Configuration, Stack}, handlers::CloudflareReturn};
 
 #[derive(Clone)]
 pub struct MeshState {
     pub keys: Configuration,
     pub pool: Pool<MySql>,
+    pub client: Client,
+
     pub pending_stack: Stack,
-    pub instance_stack: Stack
+    pub instance_stack: Stack,
+
+    pub task_queue: TaskQueue
 }
 
 pub fn with_environment() -> Configuration {
@@ -33,9 +39,9 @@ pub fn with_environment() -> Configuration {
         Ok(val) => val,
         Err(_) => panic!("[err]: Environment variable: $CLOUDFLARE_KEY not set."),
     };
-    let database = match env::var("DATABASE_KEY") {
+    let database = match env::var("DATABASE_URL") {
         Ok(val) => val,
-        Err(_) => panic!("[err]: Environment variable: $DATABASE_KEY not set."),
+        Err(_) => panic!("[err]: Environment variable: $DATABASE_URL not set."),
     };
 
     Configuration {
@@ -134,8 +140,12 @@ impl MeshState {
         MeshState {
             keys: config,
             pool: pool,
+            client: client,
+
             pending_stack: Arc::new(Mutex::new(HashMap::new())),
-            instance_stack: Arc::new(Mutex::new(HashMap::new()))
+            instance_stack: Arc::new(Mutex::new(HashMap::new())),
+
+            task_queue: Arc::new(Mutex::new(VecDeque::new()))
         }
     }
 }

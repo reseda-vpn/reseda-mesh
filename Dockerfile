@@ -56,7 +56,7 @@ ARG db_key
 ARG cloudflare_key
 
 RUN echo "#!/bin/bash\n" \
-         "  echo -e \"DATABASE_KEY='$db_key'\nAUTHENTICATION_KEY='$mesh_key'\nCLOUDFLARE_KEY='$cloudflare_key'\" > ./app/.env\n"  > script.sh
+         "  echo -e \"DATABASE_URL='$db_key'\nAUTHENTICATION_KEY='$mesh_key'\nCLOUDFLARE_KEY='$cloudflare_key'\" > ./app/.env\n"  > script.sh
 RUN chmod +x script.sh
 RUN ./script.sh
 
