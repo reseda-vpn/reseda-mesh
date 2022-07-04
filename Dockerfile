@@ -10,6 +10,9 @@ FROM rust:1.61 as cacher
 
 WORKDIR /app
 
+ARG db_key
+ENV DATABASE_URL=db_key
+
 RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
@@ -17,6 +20,9 @@ RUN cargo chef cook --release --recipe-path recipe.json
 FROM rust:1.61 as builder
 WORKDIR /app
 COPY . .
+
+ARG db_key
+ENV DATABASE_URL=db_key
 
 COPY --from=cacher /app/target target
 RUN cargo build --release --bin reseda-mesh
@@ -54,6 +60,8 @@ COPY --from=builder /app/target/release/reseda-mesh ./app
 ARG mesh_key
 ARG db_key
 ARG cloudflare_key
+
+ENV DATABASE_URL=db_key
 
 RUN echo "#!/bin/bash\n" \
          "  echo -e \"DATABASE_URL='$db_key'\nAUTHENTICATION_KEY='$mesh_key'\nCLOUDFLARE_KEY='$cloudflare_key'\" > ./app/.env\n"  > script.sh
