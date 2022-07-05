@@ -1,4 +1,4 @@
-use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, default};
+use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, default, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -9,7 +9,7 @@ pub struct Server {
     pub auth: String
 }
 
-#[derive(Deserialize, Debug, Serialize)]
+#[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct IpResponse {
     pub country: String,
     pub region: String,
@@ -29,7 +29,7 @@ pub struct Configuration {
     pub database_key: String
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub struct RegistryReturn {
     pub key: String,
     pub cert: String,
@@ -49,7 +49,7 @@ pub struct Node {
 pub enum NodeState {
     Online,
     Offline,
-    Booting
+    Registering
 }
 
 /// For queueing tasks.
@@ -63,7 +63,7 @@ pub enum TaskType {
 }
 
 pub struct Task {
-    task_type: TaskType,
-    action_object: Node,
-
+    pub task_type: TaskType,
+    pub action_object: String,
+    pub exec_after: SystemTime
 }

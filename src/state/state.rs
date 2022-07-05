@@ -17,9 +17,7 @@ pub struct MeshState {
     pub pool: Pool<MySql>,
     pub client: Client,
 
-    pub pending_stack: Stack,
     pub instance_stack: Stack,
-
     pub task_queue: TaskQueue
 }
 
@@ -142,9 +140,7 @@ impl MeshState {
             pool: pool,
             client: client,
 
-            pending_stack: Arc::new(Mutex::new(HashMap::new())),
             instance_stack: Arc::new(Mutex::new(HashMap::new())),
-
             task_queue: Arc::new(Mutex::new(VecDeque::new()))
         }
     }

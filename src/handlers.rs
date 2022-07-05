@@ -1,13 +1,15 @@
 
+use std::time::{SystemTime, Duration};
 use std::{convert::Infallible};
 use reqwest::{Client, Response};
 use serde::Deserialize;
+use sqlx::mysql::MySqlQueryResult;
 use uuid::Uuid;
 
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
 use crate::Mesh;
-use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState};
+use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState, TaskType, Task};
 use rcgen::generate_simple_self_signed;
 
 #[derive(Deserialize, Debug)]
@@ -44,7 +46,7 @@ pub async fn register_server(
         }
     };
 
-    let identifier = format!("{}-{}", location.country, id.to_string());
+    let identifier = format!("{}-{}", &location.country, id.to_string());
 
     let _ = match create_dns_records(&configuration, client, &identifier, &ip).await {
         Ok(val) => val,
@@ -60,27 +62,14 @@ pub async fn register_server(
         }
     };
 
-    match configuration.lock().await.pool.begin().await {
-        Ok(mut transaction) => {
-            match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", identifier, location.timezone, location.timezone.split("/").collect::<Vec<&str>>()[1], ip, location.country.to_lowercase().replace(" ", "-"))
-                .execute(&mut transaction)
-                .await {
-                    Ok(result) => {
-                        match transaction.commit().await {
-                            Ok(r2) => {
-                                println!("[sqlx]: Usage Log Transaction Result: {:?}, {:?}", result, r2);
-                            },
-                            Err(error) => println!("[sqlx]: Transaction Commitance Error: {:?}", error),
-                        }
-
-                    },
-                    Err(error) => println!("[sqlx]: Transaction Error: {:?}", error),
-                }
-        },
-        Err(err) => {
-            println!("[err]: Unable to perform request, user will remain unassigned. Reason: {}", err);
-        }
-    };
+    // Setup process is complete, now the server only needs to be made public.
+    // This process would usually be run here, however - we must first verify the server integrity before we can publicize it.
+    // let _ = match post_into_db(&configuration, &identifier, &location, &ip).await {
+    //     Ok(val) => val,
+    //     Err(err) => {
+    //         return Ok(Box::new(err))
+    //     }
+    // };
 
     let rr = RegistryReturn {
         cert: cert,
@@ -89,13 +78,54 @@ pub async fn register_server(
         id: identifier.to_string(),
         res: location
     };
-
+    
     let node = Node {
-        information: rr,
-        state: NodeState::Booting
+        information: rr.clone(),
+        state: NodeState::Registering
     };
 
-    Ok(Box::new(json_reply(&node.information)))
+    configuration.lock().await.instance_stack.lock().await.insert(node.information.id.clone(), node);
+
+    let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
+        Some(delay) => delay,
+        None => SystemTime::now(),
+    };
+
+    configuration.lock().await.task_queue.lock().await.push_back(Task {
+        task_type: TaskType::Instantiate,
+        // Handing over lookup information 
+        action_object: id.to_string(),
+        exec_after: execution_delay
+    });
+
+    Ok(Box::new(json_reply(&rr)))
+}
+
+async fn post_into_db(
+    configuration: &Mesh,
+    identifier: &String,
+    location: &IpResponse, 
+    ip: &String
+) -> Result<MySqlQueryResult, StatusCode> {
+    match configuration.lock().await.pool.begin().await {
+        Ok(mut transaction) => {
+            match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", identifier, location.timezone, location.timezone.split("/").collect::<Vec<&str>>()[1], ip, location.country.to_lowercase().replace(" ", "-"))
+                .execute(&mut transaction)
+                .await {
+                    Ok(result) => {
+                        match transaction.commit().await {
+                            Ok(r2) => {
+                                Ok(result)
+                            },
+                            Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                        }
+
+                    },
+                    Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                }
+        },
+        Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+    }
 }
 
 
@@ -119,7 +149,7 @@ async fn create_dns_records(
         .header("Authorization", format!("Bearer {}",  configuration.lock().await.keys.cloudflare_key))
         .send().await {
             Ok(return_val) => return_val,
-            Err(err) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
         };
 
     Ok(response)
