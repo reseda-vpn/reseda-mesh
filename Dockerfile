@@ -13,6 +13,11 @@ WORKDIR /app
 ARG db_key
 ENV DATABASE_URL=db_key
 
+RUN echo "#!/bin/bash\n" \
+         "  echo -e \"DATABASE_URL='$db_key'\" > ./app/.env\n"  > script.sh
+RUN chmod +x script.sh
+RUN ./script.sh
+
 RUN cargo install cargo-chef
 COPY --from=planner /app/recipe.json recipe.json
 RUN cargo chef cook --release --recipe-path recipe.json
@@ -23,6 +28,11 @@ COPY . .
 
 ARG db_key
 ENV DATABASE_URL=db_key
+
+RUN echo "#!/bin/bash\n" \
+         "  echo -e \"DATABASE_URL='$db_key'\" > ./app/.env\n"  > script.sh
+RUN chmod +x script.sh
+RUN ./script.sh
 
 COPY --from=cacher /app/target target
 RUN cargo build --release --bin reseda-mesh
