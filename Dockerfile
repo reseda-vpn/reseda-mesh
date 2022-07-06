@@ -30,7 +30,7 @@ ARG db_key
 ENV DATABASE_URL=db_key
 
 RUN echo "#!/bin/bash\n" \
-         "  echo -e \"DATABASE_URL='$db_key'\" > ./app/.env\n"  > script.sh
+         "  echo -e \"DATABASE_URL='$db_key'\" > .env\n"  > script.sh
 RUN chmod +x script.sh
 RUN ./script.sh
 
