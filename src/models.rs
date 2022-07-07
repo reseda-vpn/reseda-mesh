@@ -22,6 +22,29 @@ pub struct IpResponse {
     pub timezone: String
 }
 
+#[derive(Deserialize, Debug)]
+pub struct CloudflareReturn {
+    pub success: bool,
+    pub result: CloudflareResult
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CloudflareResult {
+    pub certificate: String
+}
+
+#[derive(Deserialize, Debug)]
+
+pub struct CloudflareDNSReccordCreate {
+    pub success: bool,
+    pub result: CloudflareDNSReccordCreateResult
+}
+
+#[derive(Deserialize, Debug)]
+pub struct CloudflareDNSReccordCreateResult {
+    id: String
+}
+
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
 pub struct Configuration {
     pub check_key: String,
@@ -34,6 +57,7 @@ pub struct RegistryReturn {
     pub key: String,
     pub cert: String,
     pub ip: String,
+    pub reccord_id: String,
     pub res: IpResponse,
     pub id: String
 }
@@ -59,7 +83,7 @@ pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
 pub enum TaskType {
     CheckStatus,
     Instantiate(Tries),
-    Dismiss
+    Dismiss(Tries)
 }
 
 pub type Tries = i16;

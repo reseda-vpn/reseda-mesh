@@ -84,6 +84,10 @@ async fn main() {
                                 // If it does not pass the checks, we can queue another instantiate with an instantiation number increase.
                                 // If the tries exceeds 6, the node is removed.
 
+                                // REQUEST START
+                                // ...
+                                // REQUEST END
+
                                 let result = match config_clone.lock().await.pool.begin().await {
                                     Ok(mut transaction) => {
                                         match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", node.information.id, node.information.res.timezone, node.information.res.timezone.split("/").collect::<Vec<&str>>()[1], node.information.ip, node.information.res.country.to_lowercase().replace(" ", "-"))
@@ -141,7 +145,67 @@ async fn main() {
                                 }
                             },
                             // We want to remove the node from the network and set its status accordingly
-                            models::TaskType::Dismiss => todo!(),
+                            models::TaskType::Dismiss(tries) => {
+                                if tries >= 6 { return; }
+
+                                let conf_lock = config_clone.lock().await;
+                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let node = match stack_lock.get(&current_task.action_object) {
+                                    Some(val) => val,
+                                    None => todo!(),
+                                };
+
+                                // REQUEST START
+                                // ...
+                                // REQUEST END
+
+                                let result = match config_clone.lock().await.pool.begin().await {
+                                    Ok(mut transaction) => {
+                                        match sqlx::query!("delete from Server where id = ?", node.information.id)
+                                            .execute(&mut transaction)
+                                            .await {
+                                                Ok(result) => {
+                                                    match transaction.commit().await {
+                                                        Ok(_) => {
+                                                            Ok(result)
+                                                        },
+                                                        Err(error) => { 
+                                                            Err(error) 
+                                                        }
+                                                    }
+                                                },
+                                                Err(error) => {
+                                                    Err(error)
+                                                }
+                                            }
+                                    },
+                                    Err(error) => {
+                                        Err(error)
+                                    }
+                                };
+
+                                // Now it is no longer publically advertised - although before we drop the information we best cleanup the cloudflare configuration...
+
+
+                                match result {
+                                    Ok(_) => {
+                                        // The node is now removed, we no longer have to monitor it can can safely ignore it.
+                                    },
+                                    Err(_) => {
+                                        // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
+                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
+                                            Some(delay) => delay,
+                                            None => SystemTime::now(),
+                                        };
+
+                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                            task_type: TaskType::Dismiss(tries+1),
+                                            action_object: current_task.action_object.to_string(),
+                                            exec_after: execution_delay
+                                        });
+                                    },
+                                }
+                            },
                         }
                     });
                 }else {
