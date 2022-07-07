@@ -1,4 +1,4 @@
-use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, default, time::SystemTime};
+use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -58,9 +58,11 @@ pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
 /// Relative to the server, task to manage or migrate server items, dynamically created as threads with the multi threaded locked storage.
 pub enum TaskType {
     CheckStatus,
-    Instantiate,
+    Instantiate(Tries),
     Dismiss
 }
+
+pub type Tries = i16;
 
 pub struct Task {
     pub task_type: TaskType,

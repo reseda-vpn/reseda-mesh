@@ -1,5 +1,8 @@
 {
     "cSpell.words": [
-        "Deque"
+        "Deque",
+        "rcgen",
+        "reqwest",
+        "sqlx"
     ]
 }

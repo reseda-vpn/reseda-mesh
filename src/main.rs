@@ -39,6 +39,8 @@ async fn main() {
                 if SystemTime::now() >= current_task.exec_after {
                     // Execution can proceed, do so...
 
+                    let config_clone = config.clone();
+
                     tokio::spawn(async move {
                         match current_task.task_type {
                             // We want to run a routing check to verify if the server is online/offline. If normal, queue a new check task 
@@ -51,15 +53,93 @@ async fn main() {
                                     None => SystemTime::now(),
                                 };
                                 
-                                // config.lock().await.task_queue.lock().await.push_back(Task {
-                                //     task_type: TaskType::CheckStatus,
-                                //     // Handing over lookup information 
-                                //     action_object: current_task.action_object.to_string(),
-                                //     exec_after: execution_delay
-                                // });
+                                // Readd the task as this will exec every minute
+                                config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                    task_type: TaskType::CheckStatus,
+                                    // Handing over lookup information 
+                                    action_object: current_task.action_object.to_string(),
+                                    exec_after: execution_delay
+                                });
                             },
                             // We want to add the node to the network and upgrade its status
-                            models::TaskType::Instantiate => todo!(),
+                            models::TaskType::Instantiate(tries) => {
+                                if tries >= 6 {
+                                    // Now we just give up, we've tried 6 times, after 30s initial delay (far more than necessary)
+                                    // Thus, the total time by the last try is 1 minute. If the node is offline or sending invalid responses (i.e. constantly rebooting after panic! - wrong information - no state persistance)
+                                    // We know that the server has run into issues and we must refuse its request to start.
+                                    return;
+                                }
+
+                                let conf_lock = config_clone.lock().await;
+                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let node = match stack_lock.get(&current_task.action_object) {
+                                    Some(val) => val,
+                                    None => todo!(),
+                                };
+
+                                // This is a partial culmination of a check status and a propagation step. 
+                                // We need to perform a request to the server, check if it is alive and 'well'
+                                // If so, we can give the node the status - online and post it to the reseda database.
+
+                                // If it does not pass the checks, we can queue another instantiate with an instantiation number increase.
+                                // If the tries exceeds 6, the node is removed.
+
+                                let result = match config_clone.lock().await.pool.begin().await {
+                                    Ok(mut transaction) => {
+                                        match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", node.information.id, node.information.res.timezone, node.information.res.timezone.split("/").collect::<Vec<&str>>()[1], node.information.ip, node.information.res.country.to_lowercase().replace(" ", "-"))
+                                            .execute(&mut transaction)
+                                            .await {
+                                                Ok(result) => {
+                                                    match transaction.commit().await {
+                                                        Ok(_) => {
+                                                            Ok(result)
+                                                        },
+                                                        Err(error) => { 
+                                                            Err(error) 
+                                                        }
+                                                    }
+                                                },
+                                                Err(error) => {
+                                                    Err(error)
+                                                }
+                                            }
+                                    },
+                                    Err(error) => {
+                                        Err(error)
+                                    }
+                                };
+
+                                match result {
+                                    Ok(_) => {
+                                        // Once the node has been publicized, we now need to keep monitoring it - we add a new task for 1s time 
+                                        // with the CheckStatus task type, this will then continue for the lifetime of the node.
+                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
+                                            Some(delay) => delay,
+                                            None => SystemTime::now(),
+                                        };
+
+                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                            task_type: TaskType::CheckStatus,
+                                            // Handing over lookup information 
+                                            action_object: current_task.action_object.to_string(),
+                                            exec_after: execution_delay
+                                        });
+                                    },
+                                    Err(_) => {
+                                        // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
+                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
+                                            Some(delay) => delay,
+                                            None => SystemTime::now(),
+                                        };
+
+                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                            task_type: TaskType::Instantiate(tries+1),
+                                            action_object: current_task.action_object.to_string(),
+                                            exec_after: execution_delay
+                                        });
+                                    },
+                                }
+                            },
                             // We want to remove the node from the network and set its status accordingly
                             models::TaskType::Dismiss => todo!(),
                         }

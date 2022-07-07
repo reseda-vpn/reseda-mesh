@@ -36,6 +36,8 @@ pub async fn register_server(
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
+    todo!("Check if the server already exists in the stack, if it is already connected - issue, in disconnected states we can assume a reboot and reinitialize by passing the information preassigned, i.e. skip requests.");
+
     let client = &configuration.lock().await.client;
 
     let id = Uuid::new_v4();
@@ -86,13 +88,13 @@ pub async fn register_server(
 
     configuration.lock().await.instance_stack.lock().await.insert(node.information.id.clone(), node);
 
-    let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
+    let execution_delay = match SystemTime::now().checked_add(Duration::new(30, 0)) {
         Some(delay) => delay,
         None => SystemTime::now(),
     };
 
     configuration.lock().await.task_queue.lock().await.push_back(Task {
-        task_type: TaskType::Instantiate,
+        task_type: TaskType::Instantiate(0),
         // Handing over lookup information 
         action_object: id.to_string(),
         exec_after: execution_delay
@@ -101,7 +103,7 @@ pub async fn register_server(
     Ok(Box::new(json_reply(&rr)))
 }
 
-async fn post_into_db(
+pub async fn post_into_db(
     configuration: &Mesh,
     identifier: &String,
     location: &IpResponse, 
@@ -114,17 +116,17 @@ async fn post_into_db(
                 .await {
                     Ok(result) => {
                         match transaction.commit().await {
-                            Ok(r2) => {
+                            Ok(_) => {
                                 Ok(result)
                             },
-                            Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
                         }
 
                     },
-                    Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
                 }
         },
-        Err(error) => Err(StatusCode::INTERNAL_SERVER_ERROR)
+        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
     }
 }
 
