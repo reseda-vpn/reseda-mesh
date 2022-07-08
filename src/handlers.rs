@@ -1,15 +1,14 @@
 
 use std::time::{SystemTime, Duration};
 use std::{convert::Infallible};
-use reqwest::{Client, Response};
-use serde::Deserialize;
+use reqwest::{Client};
 use sqlx::mysql::MySqlQueryResult;
 use uuid::Uuid;
 
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
 use crate::Mesh;
-use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState, TaskType, Task, CloudflareDNSReccordCreate};
+use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState, TaskType, Task, CloudflareDNSRecordCreate, CloudflareReturn};
 use rcgen::generate_simple_self_signed;
 
 pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
@@ -39,7 +38,7 @@ pub async fn register_server(
 
     let identifier = format!("{}-{}", &location.country, id.to_string());
 
-    let dns_reccord = match create_dns_records(&configuration, client, &identifier, &ip).await {
+    let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
         Ok(val) => val,
         Err(err) => {
             return Ok(Box::new(err))
@@ -66,7 +65,7 @@ pub async fn register_server(
         cert: cert,
         key: key,
         ip: ip,
-        reccord_id: dns_reccord.result.id
+        record_id: dns_record.result.id,
         id: identifier.to_string(),
         res: location
     };
@@ -126,7 +125,7 @@ async fn create_dns_records(
     client: &Client,
     identifier: &String,
     ip: &String
-) -> Result<CloudflareDNSReccordCreate, StatusCode> {
+) -> Result<CloudflareDNSRecordCreate, StatusCode> {
     let response = match client.delete("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
         .body(format!("
         {{
@@ -141,14 +140,14 @@ async fn create_dns_records(
         .header("Authorization", format!("Bearer {}",  configuration.lock().await.keys.cloudflare_key))
         .send().await {
             Ok(response) => {
-                let r = response.json::<CloudflareDNSReccordCreate>().await;
+                let r = response.json::<CloudflareDNSRecordCreate>().await.unwrap();
                 
                 Ok(r)
             },
-            Err(_) => return Err(StatusCode::INTERNAL_SERVER_ERROR),
+            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         };
 
-    Ok(response)
+    response
 }
 
 async fn create_certificates(

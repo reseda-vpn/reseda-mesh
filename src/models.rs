@@ -35,14 +35,26 @@ pub struct CloudflareResult {
 
 #[derive(Deserialize, Debug)]
 
-pub struct CloudflareDNSReccordCreate {
+pub struct CloudflareDNSRecordCreate {
     pub success: bool,
-    pub result: CloudflareDNSReccordCreateResult
+    pub result: CloudflareDNSRecordCreateResult
 }
 
 #[derive(Deserialize, Debug)]
-pub struct CloudflareDNSReccordCreateResult {
-    id: String
+pub struct CloudflareDNSRecordCreateResult {
+    pub id: String
+}
+
+#[derive(Deserialize, Debug)]
+pub struct NodeStatusResponse {
+    // The nodes current information so we can verify it is ready to be publicized 
+    pub status: String,
+    pub usage: String,
+
+    // This is information the client has which we request back so that we can verify the server which was booted **matches** the one we have in the local storage
+    pub ip: String,
+    pub cert: String,
+    pub record_id: String
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize)]
@@ -57,7 +69,7 @@ pub struct RegistryReturn {
     pub key: String,
     pub cert: String,
     pub ip: String,
-    pub reccord_id: String,
+    pub record_id: String,
     pub res: IpResponse,
     pub id: String
 }
@@ -81,7 +93,7 @@ pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
 
 /// Relative to the server, task to manage or migrate server items, dynamically created as threads with the multi threaded locked storage.
 pub enum TaskType {
-    CheckStatus,
+    CheckStatus(Tries),
     Instantiate(Tries),
     Dismiss(Tries)
 }

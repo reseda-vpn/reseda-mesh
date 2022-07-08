@@ -9,7 +9,7 @@ use tokio::sync::Mutex;
 use reqwest::Client;
 
 use crate::models::TaskQueue;
-use crate::{models::{Configuration, Stack}, handlers::CloudflareReturn};
+use crate::{models::{Configuration, Stack}, models::CloudflareReturn};
 
 #[derive(Clone)]
 pub struct MeshState {
