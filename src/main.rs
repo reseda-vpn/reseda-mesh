@@ -351,6 +351,7 @@ async fn main() {
                                     },
                                 }
                             },
+                            // We want to remove a server completely from the network and its trace information
                             models::TaskType::Purge => {
                                 // Check if this is not necessary
                                 let conf_lock = config_clone.lock().await;
@@ -386,6 +387,10 @@ async fn main() {
                                         Ok(response) => Ok(response),
                                         Err(err) => Err(err),
                                     };
+
+                                let conf_lock = config_clone.lock().await;
+                                let mut stack_lock = conf_lock.instance_stack.lock().await;
+                                stack_lock.remove(&current_task.action_object);
                             }
                         }
                     });
