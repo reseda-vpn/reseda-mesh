@@ -322,6 +322,19 @@ async fn main() {
                                                 println!("Was unable to set the state of a node to offline in a dismissal task");
                                             },
                                         };
+
+                                        // We have set the server offline, in the meantime we will count down till its removal. 
+                                        // If it comes back on in the meantime, this task will simply be skipped. Task is set for 1h time.
+                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(3600, 0)) {
+                                            Some(delay) => delay,
+                                            None => SystemTime::now(),
+                                        };
+
+                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                            task_type: TaskType::Purge,
+                                            action_object: current_task.action_object.to_string(),
+                                            exec_after: execution_delay
+                                        });
                                     },
                                     Err(_) => {
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
@@ -338,6 +351,42 @@ async fn main() {
                                     },
                                 }
                             },
+                            models::TaskType::Purge => {
+                                // Check if this is not necessary
+                                let conf_lock = config_clone.lock().await;
+                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let node = match stack_lock.get(&current_task.action_object) {
+                                    Some(val) => val,
+                                    None => {
+                                        return;
+                                    },
+                                };
+
+                                if node.state == NodeState::Online || node.state == NodeState::Registering {
+                                    // If the node was brought up in the 1h since this task was queued; we can just skip this task safely.
+                                    return;
+                                }
+
+                                // After a while, we want to completely erase a server from the mesh as it obviously is not coming back online
+                                // Furthermore, it is cluttering the cloudflare configurations, and repeated usages of this dying server that never revives
+                                // will leave many upon DNS and SSL records that are 1. not monitored and 2. unregistered by reseda for possibly impersonation 
+                                // by another server which will inherit the IP from the dead server. This is a liability and so we must clean it up after a set time period.
+
+                                // First remove the DNS record for the id.
+                                let _remove_record = match config_clone.lock().await.client.delete(format!("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records/{}", node.information.record_id))
+                                    .header("Authorization", format!("Bearer {}", config_clone.lock().await.keys.cloudflare_key))
+                                    .send().await {
+                                        Ok(response) => Ok(response),
+                                        Err(err) => Err(err),
+                                    };
+
+                                let _remove_cert = match config_clone.lock().await.client.delete(format!("https://api.cloudflare.com/client/v4/certificates/{}", node.information.cert_id))
+                                    .header("Authorization", format!("Bearer {}", config_clone.lock().await.keys.cloudflare_key))
+                                    .send().await {
+                                        Ok(response) => Ok(response),
+                                        Err(err) => Err(err),
+                                    };
+                            }
                         }
                     });
                 }else {

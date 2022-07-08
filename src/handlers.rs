@@ -45,7 +45,7 @@ pub async fn register_server(
         },
     };
 
-    let (cert, key) = match create_certificates(&configuration, client, &location, &identifier).await {
+    let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
         Ok(val) => val,
         Err(err) => {
             return Ok(Box::new(err))
@@ -65,7 +65,10 @@ pub async fn register_server(
         cert: cert,
         key: key,
         ip: ip,
+
         record_id: dns_record.result.id,
+        cert_id: cert_id,
+        
         id: identifier.to_string(),
         res: location
     };
@@ -126,7 +129,7 @@ async fn create_dns_records(
     identifier: &String,
     ip: &String
 ) -> Result<CloudflareDNSRecordCreate, StatusCode> {
-    let response = match client.delete("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
+    let response = match client.post("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
         .body(format!("
         {{
             \"type\": \"A\",
@@ -155,13 +158,13 @@ async fn create_certificates(
     client: &Client,
     location: &IpResponse,
     id: &String
-) -> Result<(String, String), StatusCode> {
+) -> Result<(String, String, String), StatusCode> {
     let cert = generate_simple_self_signed(vec![format!("{}.reseda.app", id.to_string())]).unwrap();
     let cert_public = cert.serialize_request_pem().unwrap();
     let cert_private = cert.serialize_private_key_pem();
     let cert_string = cert_public.replace("\r", "").split("\n").collect::<Vec<&str>>().join("\\n");
     
-    let (cert, key) = match client.post("https://api.cloudflare.com/client/v4/certificates")
+    let (cert, key, id) = match client.post("https://api.cloudflare.com/client/v4/certificates")
         .body(format!("
         {{
             \"hostnames\": [
@@ -184,7 +187,7 @@ async fn create_certificates(
                             println!("[err]: cloudflare certificate creation FAILED, return value FAILURE. Reason: {:?}", return_value);
                         }
 
-                        (return_value.result.certificate, cert_private)
+                        (return_value.result.certificate, cert_private, return_value.result.id)
                     },
                     Err(err) => {
                         println!("[err]: Deserializing Cloudflare Result: {}", err);
@@ -198,7 +201,7 @@ async fn create_certificates(
             },
         };
 
-    Ok((cert, key))
+    Ok((cert, key, id))
 }
 
 async fn get_location(

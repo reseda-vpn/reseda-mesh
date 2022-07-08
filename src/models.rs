@@ -30,7 +30,8 @@ pub struct CloudflareReturn {
 
 #[derive(Deserialize, Debug)]
 pub struct CloudflareResult {
-    pub certificate: String
+    pub certificate: String,
+    pub id: String
 }
 
 #[derive(Deserialize, Debug)]
@@ -69,7 +70,10 @@ pub struct RegistryReturn {
     pub key: String,
     pub cert: String,
     pub ip: String,
+
     pub record_id: String,
+    pub cert_id: String,
+    
     pub res: IpResponse,
     pub id: String
 }
@@ -82,6 +86,7 @@ pub struct Node {
     pub state: NodeState
 }
 
+#[derive(PartialEq)]
 pub enum NodeState {
     Online,
     Offline,
@@ -95,7 +100,8 @@ pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
 pub enum TaskType {
     CheckStatus(Tries),
     Instantiate(Tries),
-    Dismiss(Tries)
+    Dismiss(Tries),
+    Purge
 }
 
 pub type Tries = i16;
