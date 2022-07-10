@@ -58,7 +58,7 @@ ARG mesh_key
 ARG db_key
 ARG cloudflare_key
 
-ENV DATABASE_URL=db_key
+ENV DATABASE_URL=$db_key
 
 RUN echo "#!/bin/bash\n" \
          "  echo -e \"DATABASE_URL='$db_key'\nAUTHENTICATION_KEY='$mesh_key'\nCLOUDFLARE_KEY='$cloudflare_key'\" > ./app/.env\n"  > script.sh
