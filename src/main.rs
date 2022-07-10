@@ -400,7 +400,10 @@ async fn main() {
                     config.lock().await.task_queue.lock().await.push_back(current_task);
                 }
             }else {
-                println!("No tasks are queued, skipping...")
+                println!("No tasks are queued, skipping...");
+                
+                // If there are no current tasks, we can wait 100ms for the next one to save compute.
+                Delay::new(Duration::from_millis(100)).await;
             }
         }
     });
