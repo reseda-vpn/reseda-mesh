@@ -65,7 +65,7 @@ pub struct Configuration {
     pub database_key: String
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Debug)]
 pub struct RegistryReturn {
     pub key: String,
     pub cert: String,
@@ -80,7 +80,7 @@ pub struct RegistryReturn {
 
 pub type Stack = Arc<Mutex<HashMap<String, Node>>>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     /// This row is all the information exclusively accessible known by the server that was initialized. 
     /// Note, we need to ensure this is all valid and correct, justified and all...
@@ -88,7 +88,7 @@ pub struct Node {
     pub state: NodeState
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Debug)]
 pub enum NodeState {
     Online,
     Offline,

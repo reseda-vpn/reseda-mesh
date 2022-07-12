@@ -24,15 +24,21 @@ pub async fn register_server(
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
+    println!("Accepting Registration of {}", ip);
+
     let temp_instance_stack = &configuration.lock().await.instance_stack;
     let mut locked_stack = temp_instance_stack.lock().await;
     let exists_node = locked_stack.get_mut(&ip);
+
+    drop(temp_instance_stack);
 
     let node = match exists_node {
         Some(node) => {
             node.clone()
         },
         None => {
+            println!("No node currently exists, creating and registering a new node.");
+
             let client = &configuration.lock().await.client;
 
             let id = Uuid::new_v4();
@@ -44,6 +50,8 @@ pub async fn register_server(
             };
         
             let identifier = format!("{}-{}", &location.country, id.to_string());
+
+            println!("Generated Identification: {}", identifier);
         
             let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
                 Ok(val) => val,
@@ -51,6 +59,8 @@ pub async fn register_server(
                     return Ok(Box::new(err))
                 },
             };
+
+            println!("Generated DNS Record.");
         
             let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
                 Ok(val) => val,
@@ -58,6 +68,8 @@ pub async fn register_server(
                     return Ok(Box::new(err))
                 }
             };
+
+            println!("Generated Certificates");
 
             let rr = RegistryReturn {
                 cert: cert,
@@ -71,6 +83,8 @@ pub async fn register_server(
                 res: location
             };
 
+            println!("Formatting RegistryReturn; {:?}", rr);
+
             let node = Node {
                 information: rr.clone(),
                 state: NodeState::Registering
@@ -79,6 +93,8 @@ pub async fn register_server(
             node
         },
     };
+
+    println!("Continuing with node; {:?}", node);
 
     configuration.lock().await.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
 
@@ -93,6 +109,8 @@ pub async fn register_server(
         action_object: node.information.ip.to_string(),
         exec_after: execution_delay
     });
+
+    println!("Added task to queue.");
 
     Ok(Box::new(json_reply(&node.information)))
 }
