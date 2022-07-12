@@ -1,5 +1,3 @@
-
-use std::clone;
 use std::time::{SystemTime, Duration};
 use std::{convert::Infallible};
 use reqwest::{Client};
@@ -50,8 +48,8 @@ pub async fn register_server(
             node.clone()
         },
         None => {
+            drop(matching_node);
             println!("No node currently exists, creating and registering a new node.");
-            
 
             let client = &configuration.lock().await.client;
 
@@ -130,34 +128,6 @@ pub async fn register_server(
 
     Ok(Box::new(json_reply(&node.information)))
 }
-
-pub async fn post_into_db(
-    configuration: &Mesh,
-    identifier: &String,
-    location: &IpResponse, 
-    ip: &String
-) -> Result<MySqlQueryResult, StatusCode> {
-    match configuration.lock().await.pool.begin().await {
-        Ok(mut transaction) => {
-            match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", identifier, location.timezone, location.timezone.split("/").collect::<Vec<&str>>()[1], ip, location.country.to_lowercase().replace(" ", "-"))
-                .execute(&mut transaction)
-                .await {
-                    Ok(result) => {
-                        match transaction.commit().await {
-                            Ok(_) => {
-                                Ok(result)
-                            },
-                            Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
-                        }
-
-                    },
-                    Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
-                }
-        },
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR)
-    }
-}
-
 
 async fn create_dns_records(
     configuration: &Mesh,
