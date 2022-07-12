@@ -38,8 +38,11 @@ pub async fn register_server(
         },
         None => {
             println!("No node currently exists, creating and registering a new node.");
+            drop(locked_stack);
 
             let client = &configuration.lock().await.client;
+
+            println!("Obtained Lock on Client.");
 
             let id = Uuid::new_v4();
             let location = match get_location(client, &ip).await {
@@ -149,6 +152,8 @@ async fn create_dns_records(
     identifier: &String,
     ip: &String
 ) -> Result<CloudflareDNSRecordCreate, StatusCode> {
+    println!("Creating DNS Record.");
+
     let response = match client.post("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
         .body(format!("
         {{
