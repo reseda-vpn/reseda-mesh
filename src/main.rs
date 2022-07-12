@@ -48,6 +48,8 @@ async fn main() {
                             // We want to run a routing check to verify if the server is online/offline. If normal, queue a new check task 
                             models::TaskType::CheckStatus(tries) => {
                                 if tries >= 5 {
+                                    println!("[task]: CheckStatus->Failed: DeniedRetry");
+
                                     // If we have been unable to verify the status of the node for more than 5 seconds, we mark it for removal.
                                     let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
                                         Some(delay) => delay,
@@ -63,6 +65,8 @@ async fn main() {
 
                                     return;
                                 }
+
+                                println!("[task]: CheckStatus->Start");
 
                                 let conf_lock = config_clone.lock().await;
                                 let stack_lock = conf_lock.instance_stack.lock().await;
@@ -85,6 +89,8 @@ async fn main() {
                                         return;
                                     },
                                 };
+
+                                println!("[task]: CheckStatus->Retrieved Node");
 
                                 let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
 
@@ -114,6 +120,8 @@ async fn main() {
                                     None => {},
                                 };
 
+                                println!("[task]: CheckStatus->Finished");
+
                                 // Add another task for the same delay
                                 let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
                                     Some(delay) => delay,
@@ -131,11 +139,15 @@ async fn main() {
                             // We want to add the node to the network and upgrade its status
                             models::TaskType::Instantiate(tries) => {
                                 if tries >= 6 {
+                                    println!("[task]: Instantiate->Failed: DeniedRetry");
+
                                     // Now we just give up, we've tried 6 times, after 30s initial delay (far more than necessary)
                                     // Thus, the total time by the last try is 1 minute. If the node is offline or sending invalid responses (i.e. constantly rebooting after panic! - wrong information - no state persistance)
                                     // We know that the server has run into issues and we must refuse its request to start.
                                     return;
                                 }
+
+                                println!("[task]: Instantiate->Start");
 
                                 let conf_lock = config_clone.lock().await;
                                 let stack_lock = conf_lock.instance_stack.lock().await;
@@ -166,6 +178,8 @@ async fn main() {
                                 // If it does not pass the checks, we can queue another instantiate with an instantiation number increase.
                                 // If the tries exceeds 6, the node is removed.
 
+                                println!("[task]: Instantiate->Pinging Server");
+
                                 let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
 
                                 // Perform task
@@ -183,9 +197,13 @@ async fn main() {
                                 // Unwrap the value
                                 let _node_status = match response {
                                     Ok(response) => {
+                                        println!("[task]: Instantiate->Ping Successful");
+
                                         response
                                     },
                                     Err(_) => {
+                                        println!("[task]: Instantiate->Ping Failed");
+
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
                                         let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
                                             Some(delay) => delay,
@@ -201,6 +219,8 @@ async fn main() {
                                         return;
                                     },
                                 };
+
+                                println!("[task]: Instantiate->Publishing Server");
 
                                 // Match the SQLx response for publicizing the server
                                 let result = match config_clone.lock().await.pool.begin().await {
@@ -272,7 +292,12 @@ async fn main() {
                             },
                             // We want to remove the node from the network and set its status accordingly
                             models::TaskType::Dismiss(tries) => {
-                                if tries >= 6 { return; }
+                                if tries >= 6 { 
+                                    println!("[task]: CheckStatus->Failed: DeniedRetry");
+                                    return; 
+                                }
+
+                                println!("[task]: Dismiss->Start");
 
                                 let conf_lock = config_clone.lock().await;
                                 let stack_lock = conf_lock.instance_stack.lock().await;
