@@ -24,61 +24,63 @@ pub async fn register_server(
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
-    todo!("Check if the server already exists in the stack, if it is already connected - issue, in disconnected states we can assume a reboot and reinitialize by passing the information preassigned, i.e. skip requests.");
+    let temp_instance_stack = &configuration.lock().await.instance_stack;
+    let mut locked_stack = temp_instance_stack.lock().await;
+    let exists_node = locked_stack.get_mut(&ip);
 
-    let client = &configuration.lock().await.client;
+    let node = match exists_node {
+        Some(node) => {
+            node.clone()
+        },
+        None => {
+            let client = &configuration.lock().await.client;
 
-    let id = Uuid::new_v4();
-    let location = match get_location(client, &ip).await {
-        Ok(val) => val,
-        Err(err) => {
-            return Ok(Box::new(err))
-        }
-    };
+            let id = Uuid::new_v4();
+            let location = match get_location(client, &ip).await {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(Box::new(err))
+                }
+            };
+        
+            let identifier = format!("{}-{}", &location.country, id.to_string());
+        
+            let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(Box::new(err))
+                },
+            };
+        
+            let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
+                Ok(val) => val,
+                Err(err) => {
+                    return Ok(Box::new(err))
+                }
+            };
 
-    let identifier = format!("{}-{}", &location.country, id.to_string());
+            let rr = RegistryReturn {
+                cert: cert,
+                key: key,
+                ip: ip,
+        
+                record_id: dns_record.result.id,
+                cert_id: cert_id,
+                
+                id: identifier.to_string(),
+                res: location
+            };
 
-    let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
-        Ok(val) => val,
-        Err(err) => {
-            return Ok(Box::new(err))
+            let node = Node {
+                information: rr.clone(),
+                state: NodeState::Registering
+            };
+
+            node
         },
     };
 
-    let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
-        Ok(val) => val,
-        Err(err) => {
-            return Ok(Box::new(err))
-        }
-    };
-
-    // Setup process is complete, now the server only needs to be made public.
-    // This process would usually be run here, however - we must first verify the server integrity before we can publicize it.
-    // let _ = match post_into_db(&configuration, &identifier, &location, &ip).await {
-    //     Ok(val) => val,
-    //     Err(err) => {
-    //         return Ok(Box::new(err))
-    //     }
-    // };
-
-    let rr = RegistryReturn {
-        cert: cert,
-        key: key,
-        ip: ip,
-
-        record_id: dns_record.result.id,
-        cert_id: cert_id,
-        
-        id: identifier.to_string(),
-        res: location
-    };
-    
-    let node = Node {
-        information: rr.clone(),
-        state: NodeState::Registering
-    };
-
-    configuration.lock().await.instance_stack.lock().await.insert(node.information.id.clone(), node);
+    configuration.lock().await.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
 
     let execution_delay = match SystemTime::now().checked_add(Duration::new(30, 0)) {
         Some(delay) => delay,
@@ -88,11 +90,11 @@ pub async fn register_server(
     configuration.lock().await.task_queue.lock().await.push_back(Task {
         task_type: TaskType::Instantiate(0),
         // Handing over lookup information 
-        action_object: id.to_string(),
+        action_object: node.information.ip.to_string(),
         exec_after: execution_delay
     });
 
-    Ok(Box::new(json_reply(&rr)))
+    Ok(Box::new(json_reply(&node.information)))
 }
 
 pub async fn post_into_db(
