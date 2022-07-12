@@ -28,17 +28,19 @@ pub async fn register_server(
 
     let temp_instance_stack = &configuration.lock().await.instance_stack;
     let mut locked_stack = temp_instance_stack.lock().await;
-    let exists_node = locked_stack.get_mut(&ip);
+    let exists_node = locked_stack.get_mut(&ip).cloned();
+    let cloned_node = exists_node.clone();
 
     drop(temp_instance_stack);
+    drop(exists_node);
+    drop(locked_stack);
 
-    let node = match exists_node {
+    let node = match cloned_node {
         Some(node) => {
             node.clone()
         },
         None => {
             println!("No node currently exists, creating and registering a new node.");
-            drop(locked_stack);
 
             let client = &configuration.lock().await.client;
 
