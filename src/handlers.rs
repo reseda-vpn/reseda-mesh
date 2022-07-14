@@ -25,30 +25,9 @@ pub async fn register_server(
 
     println!("Accepting Registration of {}", ip);
 
-    let temp_instance_stack = &configuration.lock().await.instance_stack;
-    let locked_stack = temp_instance_stack.lock().await;
-    let exists_node = locked_stack.get(&ip);
-
-    let matching_node = match exists_node {
-        Some(n) => Some(
-            Node {
-                information: n.information.clone(),
-                state: n.state.clone()
-            }
-        ),
-        None => None,
-    };
-
-    drop(temp_instance_stack);
-    drop(exists_node);
-    drop(locked_stack);
-
-    let node = match matching_node {
-        Some(node) => {
-            node.clone()
-        },
+    let node = match configuration.lock().await.instance_stack.lock().await.get_mut(&ip) {
+        Some(n) => n.to_owned(),
         None => {
-            drop(matching_node);
             println!("No node currently exists, creating and registering a new node.");
 
             println!("[mutex]: Obtaining Client Lock...");
@@ -86,12 +65,12 @@ pub async fn register_server(
             println!("Generated Certificates");
 
             let rr = RegistryReturn {
-                cert: cert,
-                key: key,
-                ip: ip,
+                cert,
+                key,
+                ip,
         
                 record_id: dns_record.result.id,
-                cert_id: cert_id,
+                cert_id,
                 
                 id: identifier.to_string(),
                 res: location
@@ -99,7 +78,7 @@ pub async fn register_server(
 
             println!("Formatting RegistryReturn; {:?}", rr);
 
-            let node = Node {
+            let mut node = Node {
                 information: rr.clone(),
                 state: NodeState::Registering
             };
