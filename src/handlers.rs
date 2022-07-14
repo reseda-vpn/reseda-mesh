@@ -51,9 +51,9 @@ pub async fn register_server(
             drop(matching_node);
             println!("No node currently exists, creating and registering a new node.");
 
+            println!("[mutex]: Obtaining Client Lock...");
             let client = &configuration.lock().await.client;
-
-            println!("Obtained Lock on Client.");
+            println!("[mutex]: Obtained Lock on Client.");
 
             let id = Uuid::new_v4();
             let location = match get_location(client, &ip).await {
