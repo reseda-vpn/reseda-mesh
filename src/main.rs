@@ -40,7 +40,7 @@ async fn main() {
 
     tokio::spawn(async move {
         loop {
-            println!("[task-runner]: Attempting to start task");
+            // println!("[task-runner]: Attempting to start task");
             let config_clone = config.clone();
 
             match tokio::spawn(async move {
@@ -49,9 +49,6 @@ async fn main() {
 
                 // Execution can proceed, do so...
                 if let Some(current_task) = task_queue_lock.pop_front() {
-
-                    println!("[task-runner]: Obtained Lock, Executing Task");
-
                     if Utc::now().timestamp_millis() as u128 >= current_task.exec_at {
                         println!("[task-runner]: Executing Task: {:#?}", current_task.task_type);
 
@@ -396,7 +393,7 @@ async fn main() {
                             }
                         }
                     }else {
-                        println!("[task-runner]: Pretimed Task. Placing at the end of the queue");
+                        // println!("[task-runner]: Pretimed Task. Placing at the end of the queue");
     
                         // If task cannot be completed, push it to the back of the queue and try process the next one.
                         // This intends to maximize priority tasks by ensuring they are processed first, and that delayed tasks are processed as intended.
@@ -432,14 +429,12 @@ async fn main() {
                     // If there are no current tasks, we can wait 100ms for the next one to save compute.
                     Delay::new(Duration::from_millis(100)).await;
                 }
-        
-                println!("[task-runner]: Ended Task");
             }).await {
-                Ok(val) => {
-                    println!("[task-runner]: Returned {:?}", val)
+                Ok(_val) => {
+                    // println!("[task-runner]: Returned {:?}", val)
                 },
-                Err(err) => {
-                    println!("[task-runner]: Returned Error Value {:?}", err)
+                Err(_err) => {
+                    // println!("[task-runner]: Returned Error Value {:?}", err)
                 },
             };
         }

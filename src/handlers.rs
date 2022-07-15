@@ -65,7 +65,7 @@ pub async fn register_server(
     
                 println!("Generated DNS Record.");
             
-                let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
+                let (cert, key, cert_id) = match create_certificates(&configuration, client, &identifier).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -147,7 +147,6 @@ async fn create_dns_records(
 async fn create_certificates(
     configuration: &GuardedMesh<'_>,
     client: &Client,
-    location: &IpResponse,
     id: &String
 ) -> Result<(String, String, String), StatusCode> {
     let cert = generate_simple_self_signed(vec![format!("{}.reseda.app", id.to_string())]).unwrap();
@@ -164,7 +163,7 @@ async fn create_certificates(
             \"requested_validity\": 5475,
             \"request_type\": \"origin-rsa\",
             \"csr\": \"{}\"
-        }}", format!("{}-{}", location.country, id.to_string()), cert_string))
+        }}", id, cert_string))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}", configuration.keys.cloudflare_key))
         .send().await {
