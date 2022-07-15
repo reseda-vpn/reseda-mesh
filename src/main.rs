@@ -1,9 +1,9 @@
 use models::{NodeStatusResponse, NodeState};
 use routes::json_body;
 use state::MeshState;
-use tokio::sync::Mutex;
+use tokio::sync::{Mutex, MutexGuard};
 use warp::{self, Filter};
-use std::{sync::Arc, convert::Infallible, time::SystemTime, time::Duration};
+use std::{sync::{Arc}, convert::Infallible, time::SystemTime, time::Duration};
 use crate::models::{TaskType, Task};
 use futures_timer::Delay;
 
@@ -12,7 +12,9 @@ mod models;
 mod routes;
 mod state;
 
-pub type Mesh = Arc<Mutex<MeshState>>;
+pub type UnwrappedMesh = Mutex<MeshState>;
+pub type GuardedMesh<'a> = MutexGuard<'a, MeshState>;
+pub type Mesh = Arc<UnwrappedMesh>;
 
 #[tokio::main]
 async fn main() {

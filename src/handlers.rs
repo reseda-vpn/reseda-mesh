@@ -1,12 +1,11 @@
 use std::time::{SystemTime, Duration};
 use std::{convert::Infallible};
 use reqwest::{Client};
-use sqlx::mysql::MySqlQueryResult;
 use uuid::Uuid;
 
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
-use crate::Mesh;
+use crate::{Mesh, GuardedMesh};
 use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState, TaskType, Task, CloudflareDNSRecordCreate, CloudflareReturn};
 use rcgen::generate_simple_self_signed;
 
@@ -25,78 +24,84 @@ pub async fn register_server(
 
     println!("Accepting Registration of {}", ip);
 
-    let node = match configuration.lock().await.instance_stack.lock().await.get_mut(&ip) {
-        Some(n) => n.to_owned(),
-        None => {
-            println!("No node currently exists, creating and registering a new node.");
+    let (conf, node) = {
+        let configuration = configuration.lock().await;
 
-            println!("[mutex]: Obtaining Client Lock...");
-            let client = &configuration.lock().await.client;
-            println!("[mutex]: Obtained Lock on Client.");
+        let n = match configuration.instance_stack.lock().await.get_mut(&ip) {
+            Some(n) => n.to_owned(), 
+            None => {
+                println!("No node currently exists, creating and registering a new node.");
+    
+                println!("[mutex]: Obtaining Client Lock...");
+                let client = &configuration.client;
+                println!("[mutex]: Obtained Lock on Client.");
+    
+                let id = Uuid::new_v4();
+                let location = match get_location(client, &ip).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        return Ok(Box::new(err))
+                    }
+                };
+            
+                let identifier = format!("{}-{}", &location.country, id.to_string());
+    
+                println!("Generated Identification: {}", identifier);
+            
+                let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        return Ok(Box::new(err))
+                    },
+                };
+    
+                println!("Generated DNS Record.");
+            
+                let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        return Ok(Box::new(err))
+                    }
+                };
+    
+                println!("Generated Certificates");
+    
+                let rr = RegistryReturn {
+                    cert,
+                    key,
+                    ip,
+            
+                    record_id: dns_record.result.id,
+                    cert_id,
+                    
+                    id: identifier.to_string(),
+                    res: location
+                };
+    
+                println!("Formatting RegistryReturn; {:?}", rr);
+    
+                let node = Node {
+                    information: rr.clone(),
+                    state: NodeState::Registering
+                };
+    
+                node
+            },
+        };
 
-            let id = Uuid::new_v4();
-            let location = match get_location(client, &ip).await {
-                Ok(val) => val,
-                Err(err) => {
-                    return Ok(Box::new(err))
-                }
-            };
-        
-            let identifier = format!("{}-{}", &location.country, id.to_string());
-
-            println!("Generated Identification: {}", identifier);
-        
-            let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
-                Ok(val) => val,
-                Err(err) => {
-                    return Ok(Box::new(err))
-                },
-            };
-
-            println!("Generated DNS Record.");
-        
-            let (cert, key, cert_id) = match create_certificates(&configuration, client, &location, &identifier).await {
-                Ok(val) => val,
-                Err(err) => {
-                    return Ok(Box::new(err))
-                }
-            };
-
-            println!("Generated Certificates");
-
-            let rr = RegistryReturn {
-                cert,
-                key,
-                ip,
-        
-                record_id: dns_record.result.id,
-                cert_id,
-                
-                id: identifier.to_string(),
-                res: location
-            };
-
-            println!("Formatting RegistryReturn; {:?}", rr);
-
-            let mut node = Node {
-                information: rr.clone(),
-                state: NodeState::Registering
-            };
-
-            node
-        },
+        (configuration, n)
     };
 
     println!("Continuing with node; {:?}", node);
 
-    configuration.lock().await.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
+    conf.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
 
     let execution_delay = match SystemTime::now().checked_add(Duration::new(30, 0)) {
         Some(delay) => delay,
         None => SystemTime::now(),
     };
 
-    configuration.lock().await.task_queue.lock().await.push_back(Task {
+    conf.task_queue.lock().await.push_back(Task {
         task_type: TaskType::Instantiate(0),
         // Handing over lookup information 
         action_object: node.information.ip.to_string(),
@@ -109,7 +114,7 @@ pub async fn register_server(
 }
 
 async fn create_dns_records(
-    configuration: &Mesh,
+    configuration: &GuardedMesh<'_>,
     client: &Client,
     identifier: &String,
     ip: &String
@@ -127,7 +132,7 @@ async fn create_dns_records(
             \"proxied\": true
         }}", identifier, ip))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}",  configuration.lock().await.keys.cloudflare_key))
+        .header("Authorization", format!("Bearer {}",  configuration.keys.cloudflare_key))
         .send().await {
             Ok(response) => {
                 let r = response.json::<CloudflareDNSRecordCreate>().await.unwrap();
@@ -141,7 +146,7 @@ async fn create_dns_records(
 }
 
 async fn create_certificates(
-    configuration: &Mesh,
+    configuration: &GuardedMesh<'_>,
     client: &Client,
     location: &IpResponse,
     id: &String
@@ -162,7 +167,7 @@ async fn create_certificates(
             \"csr\": \"{}\"
         }}", format!("{}-{}", location.country, id.to_string()), cert_string))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", configuration.lock().await.keys.cloudflare_key))
+        .header("Authorization", format!("Bearer {}", configuration.keys.cloudflare_key))
         .send().await {
             Ok(response) => {
                 // println!("{:?}", response.text().await);
