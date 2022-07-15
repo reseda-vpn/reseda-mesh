@@ -99,6 +99,7 @@ pub enum NodeState {
 pub type TaskQueue = Arc<Mutex<VecDeque<Task>>>;
 
 /// Relative to the server, task to manage or migrate server items, dynamically created as threads with the multi threaded locked storage.
+#[derive(Debug)]
 pub enum TaskType {
     CheckStatus(Tries),
     Instantiate(Tries),
@@ -107,6 +108,7 @@ pub enum TaskType {
 }
 
 pub type Tries = i16;
+
 
 pub struct Task {
     pub task_type: TaskType,

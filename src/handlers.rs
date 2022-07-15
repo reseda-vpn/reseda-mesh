@@ -13,6 +13,13 @@ pub async fn echo() -> Result<Box<dyn warp::Reply>, Infallible> {
     Ok(Box::new(StatusCode::OK))
 }
 
+/// As to properly handle the mutex, the scoped approach was taken.
+/// Prior to c793e4b94771c7f1b614d416974a580bcc0ab7e1 the non-scoped approach was taken
+/// which resulting in multiple instances of deadlocking. This new approach is
+/// not recommended and should be changed as it has one fatal flaw:
+/// - The configuration cannot be accessed for the duration of MULTIPLE async requests.
+/// Thus configuration is unable to be accessed for 10s each time a registration occurs,
+/// which if abused can cripple the service. 
 pub async fn register_server(
     ip: String,
     authentication_key: Server,
@@ -107,6 +114,8 @@ pub async fn register_server(
         action_object: node.information.ip.to_string(),
         exec_after: execution_delay
     });
+
+    drop(conf);
 
     println!("Added task to queue.");
 

@@ -39,13 +39,16 @@ async fn main() {
 
     tokio::spawn(async move {
         loop {
+            println!("[task-runner]: Attempting to start task");
+
             if let Some(current_task) = config.lock().await.task_queue.lock().await.pop_front() {
                 if SystemTime::now() >= current_task.exec_after {
                     // Execution can proceed, do so...
-
                     let config_clone = config.clone();
 
                     tokio::spawn(async move {
+                        println!("[task-runner]: Executing Task: {:#?}", current_task.task_type);
+
                         match current_task.task_type {
                             // We want to run a routing check to verify if the server is online/offline. If normal, queue a new check task 
                             models::TaskType::CheckStatus(tries) => {
