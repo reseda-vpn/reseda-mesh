@@ -85,8 +85,6 @@ pub async fn register_server(
                     res: location
                 };
     
-                println!("Formatting RegistryReturn; {:?}", rr);
-    
                 let node = Node {
                     information: rr.clone(),
                     state: NodeState::Registering
@@ -115,11 +113,15 @@ pub async fn register_server(
         exec_after: execution_delay
     });
 
-    drop(conf);
-
     println!("Added task to queue.");
+    println!("Task Queue: {:?}", &conf.task_queue);
 
-    Ok(Box::new(json_reply(&node.information)))
+    let reply = json_reply(&node.information);
+
+    drop(conf);
+    drop(node);
+
+    Ok(Box::new(reply))
 }
 
 async fn create_dns_records(

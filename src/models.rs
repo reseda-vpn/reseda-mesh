@@ -110,6 +110,7 @@ pub enum TaskType {
 pub type Tries = i16;
 
 
+#[derive(Debug)]
 pub struct Task {
     pub task_type: TaskType,
     pub action_object: String,
