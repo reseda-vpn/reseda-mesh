@@ -1,7 +1,8 @@
-use std::time::{SystemTime, Duration};
+use std::time::{Duration};
 use std::{convert::Infallible};
 use reqwest::{Client};
 use uuid::Uuid;
+use chrono::Utc;
 
 use warp::reply::json as json_reply;
 use warp::{self, http::StatusCode};
@@ -74,49 +75,36 @@ pub async fn register_server(
                 println!("Generated Certificates");
     
                 let rr = RegistryReturn {
-                    cert,
-                    key,
-                    ip,
-            
-                    record_id: dns_record.result.id,
-                    cert_id,
-                    
-                    id: identifier.to_string(),
-                    res: location
+                    cert, key, ip,
+                    record_id: dns_record.result.id, cert_id,
+                    id: identifier.to_string(), res: location
                 };
     
-                let node = Node {
+                Node {
                     information: rr.clone(),
                     state: NodeState::Registering
-                };
-    
-                node
+                }
             },
         };
 
         (configuration, n)
     };
 
-    println!("Continuing with node; {:?}", node);
-
     conf.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
 
-    let execution_delay = match SystemTime::now().checked_add(Duration::new(30, 0)) {
-        Some(delay) => delay,
-        None => SystemTime::now(),
-    };
+    let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(30, 0).as_millis();
 
     conf.task_queue.lock().await.push_back(Task {
         task_type: TaskType::Instantiate(0),
         // Handing over lookup information 
         action_object: node.information.ip.to_string(),
-        exec_after: execution_delay
+        exec_at: exec_time
     });
 
     println!("Added task to queue.");
     println!("Task Queue: {:?}", &conf.task_queue);
 
-    let reply = json_reply(&node.information);
+    let reply = json_reply(&node.clone().information);
 
     drop(conf);
     drop(node);

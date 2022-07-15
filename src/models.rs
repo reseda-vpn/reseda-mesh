@@ -1,4 +1,4 @@
-use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}, time::SystemTime};
+use std::{os::raw::c_float, sync::Arc, collections::{HashMap, VecDeque}};
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
@@ -114,5 +114,5 @@ pub type Tries = i16;
 pub struct Task {
     pub task_type: TaskType,
     pub action_object: String,
-    pub exec_after: SystemTime
+    pub exec_at: u128
 }

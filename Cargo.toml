@@ -16,6 +16,7 @@ dotenv = "0.15.0"
 uuid = { version = "1.1.2", features = ["v4"] }
 sqlx = { version = "0.5.5", features = [ "mysql", "runtime-tokio-rustls", "macros" ] }
 rcgen = "0.9.2"
+chrono = "0.4.19"
 
 [dependencies.openssl]
 version = "0.10.29"

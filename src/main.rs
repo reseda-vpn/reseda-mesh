@@ -3,9 +3,10 @@ use routes::json_body;
 use state::MeshState;
 use tokio::sync::{Mutex, MutexGuard};
 use warp::{self, Filter};
-use std::{sync::{Arc}, convert::Infallible, time::SystemTime, time::Duration};
+use std::{sync::{Arc}, convert::Infallible, time::Duration};
 use crate::models::{TaskType, Task};
 use futures_timer::Delay;
+use chrono::Utc;
 
 mod handlers;
 mod models;
@@ -40,13 +41,18 @@ async fn main() {
     tokio::spawn(async move {
         loop {
             println!("[task-runner]: Attempting to start task");
+            let config_clone = config.clone();
 
-            if let Some(current_task) = config.lock().await.task_queue.lock().await.pop_front() {
-                if SystemTime::now() >= current_task.exec_after {
-                    // Execution can proceed, do so...
-                    let config_clone = config.clone();
+            match tokio::spawn(async move {
+                let config_lock = config_clone.lock().await;
+                let mut task_queue_lock = config_lock.task_queue.lock().await;
 
-                    tokio::spawn(async move {
+                // Execution can proceed, do so...
+                if let Some(current_task) = task_queue_lock.pop_front() {
+
+                    println!("[task-runner]: Obtained Lock, Executing Task");
+
+                    if Utc::now().timestamp_millis() as u128 >= current_task.exec_at {
                         println!("[task-runner]: Executing Task: {:#?}", current_task.task_type);
 
                         match current_task.task_type {
@@ -56,16 +62,13 @@ async fn main() {
                                     println!("[task]: CheckStatus->Failed: DeniedRetry");
 
                                     // If we have been unable to verify the status of the node for more than 5 seconds, we mark it for removal.
-                                    let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
-                                        Some(delay) => delay,
-                                        None => SystemTime::now(),
-                                    };
+                                    let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
 
-                                    config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                    task_queue_lock.push_back(Task {
                                         task_type: TaskType::Dismiss(0),
                                         // Handing over lookup information 
                                         action_object: current_task.action_object.to_string(),
-                                        exec_after: execution_delay
+                                        exec_at: exec_time
                                     });
 
                                     return;
@@ -73,22 +76,18 @@ async fn main() {
 
                                 println!("[task]: CheckStatus->Start");
 
-                                let conf_lock = config_clone.lock().await;
-                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
                                         // There is no matching node. We must close it instead.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
     
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Dismiss(0),
                                             // Handing over lookup information 
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
     
                                         return;
@@ -100,7 +99,7 @@ async fn main() {
                                 let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
 
                                 // Perform task
-                                let response = match config_clone.lock().await.client.get(request_url)
+                                let response = match config_lock.client.get(request_url)
                                     .header("Content-Type", "application/json")
                                     .send().await {
                                         Ok(response) => {
@@ -116,8 +115,7 @@ async fn main() {
                                     Err(_) => tries+1
                                 };
 
-                                let conf_lock = config_clone.lock().await;
-                                let mut stack_lock = conf_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 match stack_lock.get_mut(&current_task.action_object) {
                                     Some(val) => {
                                         val.state = NodeState::Online;
@@ -128,17 +126,14 @@ async fn main() {
                                 println!("[task]: CheckStatus->Finished");
 
                                 // Add another task for the same delay
-                                let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
-                                    Some(delay) => delay,
-                                    None => SystemTime::now(),
-                                };
-                                
+                                let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
+
                                 // Readd the task as this will exec every minute
-                                config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                task_queue_lock.push_back(Task {
                                     task_type: TaskType::CheckStatus(tries_count),
                                     // Handing over lookup information 
                                     action_object: current_task.action_object.to_string(),
-                                    exec_after: execution_delay
+                                    exec_at: exec_time
                                 });
                             },
                             // We want to add the node to the network and upgrade its status
@@ -154,22 +149,18 @@ async fn main() {
 
                                 println!("[task]: Instantiate->Start");
 
-                                let conf_lock = config_clone.lock().await;
-                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
                                         // There is no matching node. We must close it instead.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
     
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Dismiss(0),
                                             // Handing over lookup information 
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
     
                                         return;
@@ -188,7 +179,7 @@ async fn main() {
                                 let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
 
                                 // Perform task
-                                let response = match config_clone.lock().await.client.get(request_url)
+                                let response = match config_lock.client.get(request_url)
                                     .header("Content-Type", "application/json")
                                     .send().await {
                                         Ok(response) => {
@@ -210,15 +201,12 @@ async fn main() {
                                         println!("[task]: Instantiate->Ping Failed");
 
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(5, 0).as_millis();
 
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Instantiate(tries+1),
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
     
                                         return;
@@ -228,7 +216,7 @@ async fn main() {
                                 println!("[task]: Instantiate->Publishing Server");
 
                                 // Match the SQLx response for publicizing the server
-                                let result = match config_clone.lock().await.pool.begin().await {
+                                let result = match config_lock.pool.begin().await {
                                     Ok(mut transaction) => {
                                         match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", node.information.id, node.information.res.timezone, node.information.res.timezone.split("/").collect::<Vec<&str>>()[1], node.information.ip, node.information.res.country.to_lowercase().replace(" ", "-"))
                                             .execute(&mut transaction)
@@ -255,8 +243,7 @@ async fn main() {
 
                                 match result {
                                     Ok(_) => {
-                                        let conf_lock = config_clone.lock().await;
-                                        let mut stack_lock = conf_lock.instance_stack.lock().await;
+                                        let mut stack_lock = config_lock.instance_stack.lock().await;
                                         match stack_lock.get_mut(&current_task.action_object) {
                                             Some(val) => {
                                                 val.state = NodeState::Online
@@ -268,29 +255,23 @@ async fn main() {
 
                                         // Once the node has been publicized, we now need to keep monitoring it - we add a new task for 1s time 
                                         // with the CheckStatus task type, this will then continue for the lifetime of the node.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(1, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
 
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::CheckStatus(0),
                                             // Handing over lookup information 
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
                                     },
                                     Err(_) => {
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(5, 0).as_millis();
 
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Instantiate(tries+1),
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
                                     },
                                 }
@@ -304,14 +285,13 @@ async fn main() {
 
                                 println!("[task]: Dismiss->Start");
 
-                                let conf_lock = config_clone.lock().await;
-                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => todo!(),
                                 };
 
-                                let result = match config_clone.lock().await.pool.begin().await {
+                                let result = match config_lock.pool.begin().await {
                                     Ok(mut transaction) => {
                                         match sqlx::query!("delete from Server where id = ?", node.information.id)
                                             .execute(&mut transaction)
@@ -343,8 +323,7 @@ async fn main() {
                                         // We must set its state to offline as the node is no longer active on the mesh.
                                         // If we wish to instantiate it - i.e. we receive a new request from the server later
                                         // as it finishes the initialization after an update -> we can read from this and skip much of the init setup.
-                                        let conf_lock = config_clone.lock().await;
-                                        let mut stack_lock = conf_lock.instance_stack.lock().await;
+                                        let mut stack_lock = config_lock.instance_stack.lock().await;
                                         match stack_lock.get_mut(&current_task.action_object) {
                                             Some(val) => {
                                                 val.state = NodeState::Offline
@@ -356,28 +335,22 @@ async fn main() {
 
                                         // We have set the server offline, in the meantime we will count down till its removal. 
                                         // If it comes back on in the meantime, this task will simply be skipped. Task is set for 1h time.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(3600, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(3600, 0).as_millis();
 
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Purge,
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
                                     },
                                     Err(_) => {
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
-                                        let execution_delay = match SystemTime::now().checked_add(Duration::new(5, 0)) {
-                                            Some(delay) => delay,
-                                            None => SystemTime::now(),
-                                        };
+                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(5, 0).as_millis();
 
-                                        config_clone.lock().await.task_queue.lock().await.push_back(Task {
+                                        task_queue_lock.push_back(Task {
                                             task_type: TaskType::Dismiss(tries+1),
                                             action_object: current_task.action_object.to_string(),
-                                            exec_after: execution_delay
+                                            exec_at: exec_time
                                         });
                                     },
                                 }
@@ -385,8 +358,7 @@ async fn main() {
                             // We want to remove a server completely from the network and its trace information
                             models::TaskType::Purge => {
                                 // Check if this is not necessary
-                                let conf_lock = config_clone.lock().await;
-                                let stack_lock = conf_lock.instance_stack.lock().await;
+                                let stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
@@ -405,37 +377,71 @@ async fn main() {
                                 // by another server which will inherit the IP from the dead server. This is a liability and so we must clean it up after a set time period.
 
                                 // First remove the DNS record for the id.
-                                let _remove_record = match config_clone.lock().await.client.delete(format!("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records/{}", node.information.record_id))
-                                    .header("Authorization", format!("Bearer {}", config_clone.lock().await.keys.cloudflare_key))
+                                let _remove_record = match config_lock.client.delete(format!("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records/{}", node.information.record_id))
+                                    .header("Authorization", format!("Bearer {}", config_lock.keys.cloudflare_key))
                                     .send().await {
                                         Ok(response) => Ok(response),
                                         Err(err) => Err(err),
                                     };
 
-                                let _remove_cert = match config_clone.lock().await.client.delete(format!("https://api.cloudflare.com/client/v4/certificates/{}", node.information.cert_id))
-                                    .header("Authorization", format!("Bearer {}", config_clone.lock().await.keys.cloudflare_key))
+                                let _remove_cert = match config_lock.client.delete(format!("https://api.cloudflare.com/client/v4/certificates/{}", node.information.cert_id))
+                                    .header("Authorization", format!("Bearer {}", config_lock.keys.cloudflare_key))
                                     .send().await {
                                         Ok(response) => Ok(response),
                                         Err(err) => Err(err),
                                     };
 
-                                let conf_lock = config_clone.lock().await;
-                                let mut stack_lock = conf_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 stack_lock.remove(&current_task.action_object);
                             }
                         }
-                    });
+                    }else {
+                        println!("[task-runner]: Pretimed Task. Placing at the end of the queue");
+    
+                        // If task cannot be completed, push it to the back of the queue and try process the next one.
+                        // This intends to maximize priority tasks by ensuring they are processed first, and that delayed tasks are processed as intended.
+                        task_queue_lock.push_back(current_task);
+
+                        // However, if the task is the ONLY task left, or all tasks have yet to be completed. This will simply loop.
+                        // As a result, will prevent the following else statements performance safety from engaging and thus
+                        // Stopping many VMs from functioning. As a result, we must CHECK for the next task and put the minimum timer on to reach that task.
+                        // Thus, we will wait for 100ms, or if the next task is due before then - we wait `x`ms where `x` is the time till the task is due.
+
+                        let earliest_task = match task_queue_lock.iter_mut().min_by_key(| x | {
+                            x.exec_at
+                        }) {
+                            Some(t) => t.exec_at,
+                            None => Utc::now().timestamp_millis() as u128,
+                        };
+
+                        let current_time_in_ms = Utc::now().timestamp_millis() as u128;
+                        let delta = earliest_task - current_time_in_ms;
+
+                        Delay::new(
+                            Duration::from_millis(
+                                std::cmp::min(
+                                    100, 
+                                    delta as u64
+                                )
+                            )
+                        ).await;
+                    }
                 }else {
-                    // If task cannot be completed, push it to the back of the queue and try process the next one.
-                    // This intends to maximize priority tasks by ensuring they are processed first, and that delayed tasks are processed as intended.
-                    config.lock().await.task_queue.lock().await.push_back(current_task);
+                    println!("No tasks are queued, skipping...");
+                    
+                    // If there are no current tasks, we can wait 100ms for the next one to save compute.
+                    Delay::new(Duration::from_millis(100)).await;
                 }
-            }else {
-                println!("No tasks are queued, skipping...");
-                
-                // If there are no current tasks, we can wait 100ms for the next one to save compute.
-                Delay::new(Duration::from_millis(100)).await;
-            }
+        
+                println!("[task-runner]: Ended Task");
+            }).await {
+                Ok(val) => {
+                    println!("[task-runner]: Returned {:?}", val)
+                },
+                Err(err) => {
+                    println!("[task-runner]: Returned Error Value {:?}", err)
+                },
+            };
         }
     });
 
