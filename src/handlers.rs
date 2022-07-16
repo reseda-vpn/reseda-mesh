@@ -52,7 +52,7 @@ pub async fn register_server(
                     }
                 };
             
-                let identifier = format!("{}-{}", &location.country, id.to_string());
+                let identifier = format!("{}-{}", &location.country.to_lowercase(), id.to_string());
     
                 println!("Generated Identification: {}", identifier);
             

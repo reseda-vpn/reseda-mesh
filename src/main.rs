@@ -424,8 +424,6 @@ async fn main() {
                         ).await;
                     }
                 }else {
-                    println!("No tasks are queued, skipping...");
-                    
                     // If there are no current tasks, we can wait 100ms for the next one to save compute.
                     Delay::new(Duration::from_millis(100)).await;
                 }
