@@ -158,7 +158,7 @@ async fn create_certificates(
         .body(format!("
         {{
             \"hostnames\": [
-                \"{}.reseda.app\"
+                \"{}.dns.reseda.app\"
             ],
             \"requested_validity\": 5475,
             \"request_type\": \"origin-rsa\",
