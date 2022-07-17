@@ -56,7 +56,7 @@ async fn main() {
                             // We want to run a routing check to verify if the server is online/offline. If normal, queue a new check task 
                             models::TaskType::CheckStatus(tries) => {
                                 if tries >= 5 {
-                                    println!("[task]: CheckStatus->Failed: DeniedRetry");
+                                    println!("[task]: CheckStatus->Failed: DeniedRetry, Dismissing...");
 
                                     // If we have been unable to verify the status of the node for more than 5 seconds, we mark it for removal.
                                     let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
@@ -246,9 +246,11 @@ async fn main() {
                                                 val.state = NodeState::Online
                                             },
                                             None => {
-                                                println!("Was unable to set the state of a node to online in a instantiate task");
+                                                println!("[task]: Was unable to set the state of a node to NodeStaet::Online in a instantiate task");
                                             },
                                         };
+
+                                        println!("[task]: Node Published, creating CheckStatus loop... ");
 
                                         // Once the node has been publicized, we now need to keep monitoring it - we add a new task for 1s time 
                                         // with the CheckStatus task type, this will then continue for the lifetime of the node.
@@ -261,7 +263,9 @@ async fn main() {
                                             exec_at: exec_time
                                         });
                                     },
-                                    Err(_) => {
+                                    Err(error) => {
+                                        println!("[task]: Unable to publish server due to sqlx error: {:?}", error);
+
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
                                         let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(5, 0).as_millis();
 
