@@ -73,7 +73,7 @@ async fn main() {
 
                                 println!("[task]: CheckStatus->Start");
 
-                                let stack_lock = config_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
@@ -112,7 +112,6 @@ async fn main() {
                                     Err(_) => tries+1
                                 };
 
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 match stack_lock.get_mut(&current_task.action_object) {
                                     Some(val) => {
                                         val.state = NodeState::Online;
@@ -286,7 +285,7 @@ async fn main() {
 
                                 println!("[task]: Dismiss->Start");
 
-                                let stack_lock = config_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => todo!(),
@@ -324,7 +323,6 @@ async fn main() {
                                         // We must set its state to offline as the node is no longer active on the mesh.
                                         // If we wish to instantiate it - i.e. we receive a new request from the server later
                                         // as it finishes the initialization after an update -> we can read from this and skip much of the init setup.
-                                        let mut stack_lock = config_lock.instance_stack.lock().await;
                                         match stack_lock.get_mut(&current_task.action_object) {
                                             Some(val) => {
                                                 val.state = NodeState::Offline
@@ -359,7 +357,7 @@ async fn main() {
                             // We want to remove a server completely from the network and its trace information
                             models::TaskType::Purge => {
                                 // Check if this is not necessary
-                                let stack_lock = config_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
@@ -392,7 +390,6 @@ async fn main() {
                                         Err(err) => Err(err),
                                     };
 
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 stack_lock.remove(&current_task.action_object);
                             }
                         }
