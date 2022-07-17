@@ -334,6 +334,8 @@ async fn main() {
                                             },
                                         };
 
+                                        println!("[task]: Dismiss->Complete Instantiating Purge for 3600s from Time::Now");
+
                                         // We have set the server offline, in the meantime we will count down till its removal. 
                                         // If it comes back on in the meantime, this task will simply be skipped. Task is set for 1h time.
                                         let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(3600, 0).as_millis();
@@ -345,6 +347,8 @@ async fn main() {
                                         });
                                     },
                                     Err(_) => {
+                                        println!("[task]: Dismiss->Failure Retrying Dismiss Time::Now");
+
                                         // Uh oh, something went wrong. Thats okay, we can just requeue this task for 5s time and increment the try counter.
                                         let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(5, 0).as_millis();
 
@@ -358,6 +362,8 @@ async fn main() {
                             },
                             // We want to remove a server completely from the network and its trace information
                             models::TaskType::Purge => {
+                                println!("[task]: Purge->Start");
+
                                 // Check if this is not necessary
                                 let mut stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
@@ -366,6 +372,8 @@ async fn main() {
                                         return;
                                     },
                                 };
+
+                                println!("[task]: Purge->Neccesary");
 
                                 if node.state == NodeState::Online || node.state == NodeState::Registering {
                                     // If the node was brought up in the 1h since this task was queued; we can just skip this task safely.
@@ -391,6 +399,8 @@ async fn main() {
                                         Ok(response) => Ok(response),
                                         Err(err) => Err(err),
                                     };
+                                
+                                println!("[task]: Purge->Removed");
 
                                 stack_lock.remove(&current_task.action_object);
                             }
