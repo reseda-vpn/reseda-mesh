@@ -124,7 +124,7 @@ async fn create_dns_records(
         .body(format!("
         {{
             \"type\": \"A\",
-            \"name\": \"{}.dns\",
+            \"name\": \"{}\",
             \"content\": \"{}\",
             \"ttl\": 3600,
             \"priority\": 10,
@@ -158,7 +158,7 @@ async fn create_certificates(
         .body(format!("
         {{
             \"hostnames\": [
-                \"{}.dns.reseda.app\"
+                \"{}.reseda.app\"
             ],
             \"requested_validity\": 5475,
             \"request_type\": \"origin-rsa\",

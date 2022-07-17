@@ -93,7 +93,7 @@ async fn main() {
 
                                 println!("[task]: CheckStatus->Retrieved Node");
 
-                                let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
+                                let request_url = format!("https://{}.reseda.app/health", node.information.id);
 
                                 // Perform task
                                 let response = match config_lock.client.get(request_url)
@@ -173,7 +173,7 @@ async fn main() {
 
                                 println!("[task]: Instantiate->Pinging Server");
 
-                                let request_url = format!("https://{}.dns.reseda.app/health", node.information.id);
+                                let request_url = format!("https://{}.reseda.app/health", node.information.id);
 
                                 // Perform task
                                 let response = match config_lock.client.get(request_url)
