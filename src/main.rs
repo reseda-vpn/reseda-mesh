@@ -73,22 +73,25 @@ async fn main() {
 
                                 println!("[task]: CheckStatus->Start");
 
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
-                                let node = match stack_lock.get(&current_task.action_object) {
-                                    Some(val) => val,
-                                    None => {
-                                        // There is no matching node. We must close it instead.
-                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
-    
-                                        task_queue_lock.push_back(Task {
-                                            task_type: TaskType::Dismiss(0),
-                                            // Handing over lookup information 
-                                            action_object: current_task.action_object.to_string(),
-                                            exec_at: exec_time
-                                        });
-    
-                                        return;
-                                    },
+                                let node = {
+                                    let stack_lock = config_lock.instance_stack.lock().await;
+
+                                    match stack_lock.get(&current_task.action_object) {
+                                        Some(val) => val,
+                                        None => {
+                                            // There is no matching node. We must close it instead.
+                                            let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
+        
+                                            task_queue_lock.push_back(Task {
+                                                task_type: TaskType::Dismiss(0),
+                                                // Handing over lookup information 
+                                                action_object: current_task.action_object.to_string(),
+                                                exec_at: exec_time
+                                            });
+        
+                                            return;
+                                        },
+                                    }.clone()
                                 };
 
                                 println!("[task]: CheckStatus->Retrieved Node");
@@ -113,6 +116,7 @@ async fn main() {
                                     Err(_) => tries+1
                                 };
 
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 match stack_lock.get_mut(&current_task.action_object) {
                                     Some(val) => {
                                         val.state = NodeState::Online;
