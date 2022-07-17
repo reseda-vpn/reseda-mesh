@@ -100,9 +100,10 @@ async fn main() {
                                     .header("Content-Type", "application/json")
                                     .send().await {
                                         Ok(response) => {
-                                            let r = response.json::<NodeStatusResponse>().await.unwrap();
-                                            
-                                            Ok(r)
+                                            match response.json::<NodeStatusResponse>().await {
+                                                Ok(res) => Ok(res),
+                                                Err(err) => Err(err),
+                                            }
                                         },
                                         Err(err) => Err(err),
                                     };
@@ -179,9 +180,10 @@ async fn main() {
                                     .header("Content-Type", "application/json")
                                     .send().await {
                                         Ok(response) => {
-                                            let r = response.json::<NodeStatusResponse>().await.unwrap();
-                                            
-                                            Ok(r)
+                                            match response.json::<NodeStatusResponse>().await {
+                                                Ok(r) => Ok(r),
+                                                Err(err) => Err(err),
+                                            }
                                         },
                                         Err(err) => Err(err),
                                     };
