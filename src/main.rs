@@ -146,7 +146,7 @@ async fn main() {
 
                                 println!("[task]: Instantiate->Start");
 
-                                let stack_lock = config_lock.instance_stack.lock().await;
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 let node = match stack_lock.get(&current_task.action_object) {
                                     Some(val) => val,
                                     None => {
@@ -240,13 +240,13 @@ async fn main() {
 
                                 match result {
                                     Ok(_) => {
-                                        let mut stack_lock = config_lock.instance_stack.lock().await;
+                                        println!("[task]: Node Published, changing local NodeState to NodeState::Online");
                                         match stack_lock.get_mut(&current_task.action_object) {
                                             Some(val) => {
                                                 val.state = NodeState::Online
                                             },
                                             None => {
-                                                println!("[task]: Was unable to set the state of a node to NodeStaet::Online in a instantiate task");
+                                                println!("[task]: Was unable to set the state of a node to NodeState::Online in a instantiate task");
                                             },
                                         };
 
