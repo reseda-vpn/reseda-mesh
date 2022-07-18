@@ -72,6 +72,7 @@ pub struct RegistryReturn {
     pub ip: String,
 
     pub record_id: String,
+    pub record_dns_id: String,
     pub cert_id: String,
     
     pub res: IpResponse,

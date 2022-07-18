@@ -422,6 +422,13 @@ async fn main() {
                                         Err(err) => Err(err),
                                     };
 
+                                let _remove_dns_record = match config_lock.client.delete(format!("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records/{}", node.information.record_dns_id))
+                                    .header("Authorization", format!("Bearer {}", config_lock.keys.cloudflare_key))
+                                    .send().await {
+                                        Ok(response) => Ok(response),
+                                        Err(err) => Err(err),
+                                    };
+
                                 let _remove_cert = match config_lock.client.delete(format!("https://api.cloudflare.com/client/v4/certificates/{}", node.information.cert_id))
                                     .header("Authorization", format!("Bearer {}", config_lock.keys.cloudflare_key))
                                     .send().await {

@@ -65,7 +65,7 @@ pub async fn register_server(
     
                 println!("Generated Identification: {}", identifier);
             
-                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &ip).await {
+                let record = match create_dns_records(&cloudflare_key, &client, &identifier, &ip, true).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -73,6 +73,15 @@ pub async fn register_server(
                 };
     
                 println!("Generated DNS Record.");
+
+                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &format!("{}.dns", ip), false).await {
+                    Ok(val) => val,
+                    Err(err) => {
+                        return Ok(Box::new(err))
+                    },
+                };
+
+                println!("Generated DNS Record 2.");
             
                 let (cert, key, cert_id) = match create_certificates(&cloudflare_key, &client, &identifier).await {
                     Ok(val) => val,
@@ -85,7 +94,7 @@ pub async fn register_server(
     
                 let rr = RegistryReturn {
                     cert, key, ip,
-                    record_id: dns_record.result.id, cert_id,
+                    record_id: record.result.id, record_dns_id: dns_record.result.id, cert_id,
                     id: identifier.to_string(), res: location
                 };
     
@@ -134,7 +143,8 @@ async fn create_dns_records(
     cloudflare_key: &String,
     client: &Client,
     identifier: &String,
-    ip: &String
+    ip: &String,
+    proxied: bool
 ) -> Result<CloudflareDNSRecordCreate, StatusCode> {
     println!("Creating DNS Record.");
 
@@ -146,8 +156,8 @@ async fn create_dns_records(
             \"content\": \"{}\",
             \"ttl\": 3600,
             \"priority\": 10,
-            \"proxied\": true
-        }}", identifier, ip))
+            \"proxied\": {}
+        }}", identifier, ip, proxied))
         .header("Content-Type", "application/json")
         .header("Authorization", format!("Bearer {}",  cloudflare_key))
         .send().await {
