@@ -150,22 +150,25 @@ async fn main() {
 
                                 println!("[task]: Instantiate->Start");
 
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
-                                let node = match stack_lock.get(&current_task.action_object) {
-                                    Some(val) => val,
-                                    None => {
-                                        // There is no matching node. We must close it instead.
-                                        let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
-    
-                                        task_queue_lock.push_back(Task {
-                                            task_type: TaskType::Dismiss(0),
-                                            // Handing over lookup information 
-                                            action_object: current_task.action_object.to_string(),
-                                            exec_at: exec_time
-                                        });
-    
-                                        return;
-                                    }
+                                let node = {
+                                    let stack_lock = config_lock.instance_stack.lock().await;
+
+                                    match stack_lock.get(&current_task.action_object) {
+                                        Some(val) => val,
+                                        None => {
+                                            // There is no matching node. We must close it instead.
+                                            let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
+        
+                                            task_queue_lock.push_back(Task {
+                                                task_type: TaskType::Dismiss(0),
+                                                // Handing over lookup information 
+                                                action_object: current_task.action_object.to_string(),
+                                                exec_at: exec_time
+                                            });
+        
+                                            return;
+                                        },
+                                    }.clone()
                                 };
 
                                 // This is a partial culmination of a check status and a propagation step. 
@@ -246,6 +249,8 @@ async fn main() {
                                 match result {
                                     Ok(_) => {
                                         println!("[task]: Node Published, changing local NodeState to NodeState::Online");
+                                        let mut stack_lock = config_lock.instance_stack.lock().await;
+
                                         match stack_lock.get_mut(&current_task.action_object) {
                                             Some(val) => {
                                                 val.state = NodeState::Online
@@ -291,10 +296,25 @@ async fn main() {
 
                                 println!("[task]: Dismiss->Start");
 
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
-                                let node = match stack_lock.get(&current_task.action_object) {
-                                    Some(val) => val,
-                                    None => todo!(),
+                                let node = {
+                                    let stack_lock = config_lock.instance_stack.lock().await;
+
+                                    match stack_lock.get(&current_task.action_object) {
+                                        Some(val) => val,
+                                        None => {
+                                            // There is no matching node. We must close it instead.
+                                            let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
+        
+                                            task_queue_lock.push_back(Task {
+                                                task_type: TaskType::Dismiss(tries+1),
+                                                // Handing over lookup information 
+                                                action_object: current_task.action_object.to_string(),
+                                                exec_at: exec_time
+                                            });
+        
+                                            return;
+                                        },
+                                    }.clone()
                                 };
 
                                 let result = match config_lock.pool.begin().await {
@@ -325,6 +345,8 @@ async fn main() {
                                 // Now it is no longer publicly advertised - although before we drop the information we best cleanup the cloudflare configuration...
                                 match result {
                                     Ok(_) => {
+                                        let mut stack_lock = config_lock.instance_stack.lock().await;
+
                                         // The node is now removed, we no longer have to monitor it can can safely ignore it.
                                         // We must set its state to offline as the node is no longer active on the mesh.
                                         // If we wish to instantiate it - i.e. we receive a new request from the server later
@@ -369,12 +391,15 @@ async fn main() {
                                 println!("[task]: Purge->Start");
 
                                 // Check if this is not necessary
-                                let mut stack_lock = config_lock.instance_stack.lock().await;
-                                let node = match stack_lock.get(&current_task.action_object) {
-                                    Some(val) => val,
-                                    None => {
-                                        return;
-                                    },
+                                let node = {
+                                    let stack_lock = config_lock.instance_stack.lock().await;
+
+                                    match stack_lock.get(&current_task.action_object) {
+                                        Some(val) => val,
+                                        None => {
+                                            return;
+                                        },
+                                    }.clone()
                                 };
 
                                 println!("[task]: Purge->Neccesary");
@@ -406,6 +431,7 @@ async fn main() {
                                 
                                 println!("[task]: Purge->Removed");
 
+                                let mut stack_lock = config_lock.instance_stack.lock().await;
                                 stack_lock.remove(&current_task.action_object);
                             }
                         }

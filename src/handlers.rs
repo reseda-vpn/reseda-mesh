@@ -4,9 +4,10 @@ use reqwest::{Client};
 use uuid::Uuid;
 use chrono::Utc;
 
-use warp::reply::json as json_reply;
+use warp::Reply;
+use warp::reply::{json as json_reply};
 use warp::{self, http::StatusCode};
-use crate::{Mesh, GuardedMesh};
+use crate::{Mesh};
 use crate::models::{Server, IpResponse, RegistryReturn, Node, NodeState, TaskType, Task, CloudflareDNSRecordCreate, CloudflareReturn};
 use rcgen::generate_simple_self_signed;
 
@@ -25,27 +26,35 @@ pub async fn register_server(
     ip: String,
     authentication_key: Server,
     configuration: Mesh
-) -> Result<Box<dyn warp::Reply>, Infallible> {
+) -> Result<Box<dyn Reply>, Infallible> {
     if authentication_key.auth != configuration.lock().await.keys.check_key {
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
     println!("Accepting Registration of {}", ip);
 
-    let (conf, node) = {
-        let configuration = configuration.lock().await;
+    let node = {
+        let config_lock = configuration.lock().await;
 
-        let n = match configuration.instance_stack.lock().await.get_mut(&ip) {
-            Some(n) => n.to_owned(), 
-            None => {
+        let cloudflare_key = config_lock.keys.cloudflare_key.clone();
+        let client = config_lock.client.clone();
+
+        let exists = config_lock.instance_stack.lock().await.contains_key(&ip).clone();
+
+        drop(config_lock);
+
+        match exists {
+            true => {
+                configuration.lock().await.instance_stack.lock().await.get_mut(&ip).cloned()
+            },
+            false => {
                 println!("No node currently exists, creating and registering a new node.");
     
                 println!("[mutex]: Obtaining Client Lock...");
-                let client = &configuration.client;
                 println!("[mutex]: Obtained Lock on Client.");
     
                 let id = Uuid::new_v4();
-                let location = match get_location(client, &ip).await {
+                let location = match get_location(&client, &ip).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -56,7 +65,7 @@ pub async fn register_server(
     
                 println!("Generated Identification: {}", identifier);
             
-                let dns_record = match create_dns_records(&configuration, client, &identifier, &ip).await {
+                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &ip).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -65,7 +74,7 @@ pub async fn register_server(
     
                 println!("Generated DNS Record.");
             
-                let (cert, key, cert_id) = match create_certificates(&configuration, client, &identifier).await {
+                let (cert, key, cert_id) = match create_certificates(&cloudflare_key, &client, &identifier).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -80,40 +89,49 @@ pub async fn register_server(
                     id: identifier.to_string(), res: location
                 };
     
-                Node {
+                Some(Node {
                     information: rr.clone(),
                     state: NodeState::Registering
-                }
+                })
             },
-        };
-
-        (configuration, n)
+        }
     };
 
-    conf.instance_stack.lock().await.insert(node.information.ip.clone(), node.clone());
+    let res: Box<(dyn Reply + 'static)> = match node {
+        Some(n) => {
+            let config_lock = configuration.lock().await;
 
-    let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(30, 0).as_millis();
+            config_lock.instance_stack.lock().await.insert(n.information.ip.clone(), n.clone());
 
-    conf.task_queue.lock().await.push_back(Task {
-        task_type: TaskType::Instantiate(0),
-        // Handing over lookup information 
-        action_object: node.information.ip.to_string(),
-        exec_at: exec_time
-    });
+            let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(30, 0).as_millis();
 
-    println!("Added task to queue.");
-    println!("Task Queue: {:?}", &conf.task_queue);
+            config_lock.task_queue.lock().await.push_back(Task {
+                task_type: TaskType::Instantiate(0),
+                // Handing over lookup information 
+                action_object: n.information.ip.to_string(),
+                exec_at: exec_time
+            });
 
-    let reply = json_reply(&node.clone().information);
+            println!("Added task to queue.");
+            println!("Task Queue: {:?}", &config_lock.task_queue);
 
-    drop(conf);
-    drop(node);
+            let reply = json_reply(&n.clone().information);
 
-    Ok(Box::new(reply))
+            drop(config_lock);
+            drop(n);
+
+            Box::new(reply)
+        },
+        None => {
+            Box::new(StatusCode::INTERNAL_SERVER_ERROR)
+        },
+    };
+    
+    Ok(res)
 }
 
 async fn create_dns_records(
-    configuration: &GuardedMesh<'_>,
+    cloudflare_key: &String,
     client: &Client,
     identifier: &String,
     ip: &String
@@ -131,7 +149,7 @@ async fn create_dns_records(
             \"proxied\": true
         }}", identifier, ip))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}",  configuration.keys.cloudflare_key))
+        .header("Authorization", format!("Bearer {}",  cloudflare_key))
         .send().await {
             Ok(response) => {
                 let r = response.json::<CloudflareDNSRecordCreate>().await.unwrap();
@@ -145,7 +163,7 @@ async fn create_dns_records(
 }
 
 async fn create_certificates(
-    configuration: &GuardedMesh<'_>,
+    cloudflare_key: &String,
     client: &Client,
     id: &String
 ) -> Result<(String, String, String), StatusCode> {
@@ -165,7 +183,7 @@ async fn create_certificates(
             \"csr\": \"{}\"
         }}", id, cert_string))
         .header("Content-Type", "application/json")
-        .header("Authorization", format!("Bearer {}", configuration.keys.cloudflare_key))
+        .header("Authorization", format!("Bearer {}", cloudflare_key))
         .send().await {
             Ok(response) => {
                 // println!("{:?}", response.text().await);
