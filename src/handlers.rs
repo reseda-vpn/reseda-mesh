@@ -72,9 +72,9 @@ pub async fn register_server(
                     },
                 };
     
-                println!("Generated DNS Record.");
+                println!("Generated DNS Record: {}", format!("{}.dns", &identifier.to_string()));
 
-                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &format!("{}.dns", ip.to_string()), false).await {
+                let dns_record = match create_dns_records(&cloudflare_key, &client, &format!("{}.dns", &identifier.to_string()), &ip, false).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -196,7 +196,7 @@ async fn create_certificates(
             return Err(StatusCode::INTERNAL_SERVER_ERROR)
         },
     };
-    
+
     let cert_private = cert.serialize_private_key_pem();
     let cert_string = cert_public.replace("\r", "").split("\n").collect::<Vec<&str>>().join("\\n");
     
