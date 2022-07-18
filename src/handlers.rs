@@ -74,7 +74,7 @@ pub async fn register_server(
     
                 println!("Generated DNS Record.");
 
-                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &format!("{}.dns", ip), false).await {
+                let dns_record = match create_dns_records(&cloudflare_key, &client, &identifier, &format!("{}.dns", ip.to_string()), false).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
@@ -162,9 +162,13 @@ async fn create_dns_records(
         .header("Authorization", format!("Bearer {}",  cloudflare_key))
         .send().await {
             Ok(response) => {
-                let r = response.json::<CloudflareDNSRecordCreate>().await.unwrap();
-                
-                Ok(r)
+                match response.json::<CloudflareDNSRecordCreate>().await {
+                    Ok(r) => Ok(r),
+                    Err(err) => {
+                        println!("[err]: Deserializing Cloudflare Result: {}", err);
+                        return Err(StatusCode::INTERNAL_SERVER_ERROR)
+                    },
+                }
             },
             Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
         };
@@ -177,8 +181,22 @@ async fn create_certificates(
     client: &Client,
     id: &String
 ) -> Result<(String, String, String), StatusCode> {
-    let cert = generate_simple_self_signed(vec![format!("{}.reseda.app", id.to_string())]).unwrap();
-    let cert_public = cert.serialize_request_pem().unwrap();
+    let cert = match generate_simple_self_signed(vec![format!("{}.reseda.app", id.to_string())]) {
+        Ok(r) => r,
+        Err(err) => {
+            println!("[err]: Deserializing Certificate: {}", err);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR)
+        },
+    };
+
+    let cert_public = match cert.serialize_request_pem() {
+        Ok(r) => r,
+        Err(err) => {
+            println!("[err]: Deserializing Certificate: {}", err);
+            return Err(StatusCode::INTERNAL_SERVER_ERROR)
+        },
+    };
+    
     let cert_private = cert.serialize_private_key_pem();
     let cert_string = cert_public.replace("\r", "").split("\n").collect::<Vec<&str>>().join("\\n");
     
