@@ -31,8 +31,6 @@ pub async fn register_server(
         return Ok(Box::new(StatusCode::FORBIDDEN))
     }
 
-    println!("Accepting Registration of {}", ip);
-
     let node = {
         let config_lock = configuration.lock().await;
 
@@ -48,8 +46,6 @@ pub async fn register_server(
                 configuration.lock().await.instance_stack.lock().await.get_mut(&ip).cloned()
             },
             false => {
-                println!("No node currently exists, creating and registering a new node.");
-    
                 println!("[mutex]: Obtaining Client Lock...");
                 println!("[mutex]: Obtained Lock on Client.");
     
@@ -63,16 +59,12 @@ pub async fn register_server(
             
                 let identifier = format!("{}-{}", &location.country.to_lowercase(), id.to_string());
     
-                println!("Generated Identification: {}", identifier);
-            
                 let record = match create_dns_records(&cloudflare_key, &client, &identifier, &ip, true).await {
                     Ok(val) => val,
                     Err(err) => {
                         return Ok(Box::new(err))
                     },
                 };
-    
-                println!("Generated DNS Record: {}", format!("{}.dns", &identifier.to_string()));
 
                 let dns_record = match create_dns_records(&cloudflare_key, &client, &format!("{}.dns", &identifier.to_string()), &ip, false).await {
                     Ok(val) => val,
@@ -80,8 +72,6 @@ pub async fn register_server(
                         return Ok(Box::new(err))
                     },
                 };
-
-                println!("Generated DNS Record 2.");
             
                 let (cert, key, cert_id) = match create_certificates(&cloudflare_key, &client, &identifier).await {
                     Ok(val) => val,
@@ -89,8 +79,6 @@ pub async fn register_server(
                         return Ok(Box::new(err))
                     }
                 };
-    
-                println!("Generated Certificates");
     
                 let rr = RegistryReturn {
                     cert, key, ip,
@@ -121,7 +109,6 @@ pub async fn register_server(
                 exec_at: exec_time
             });
 
-            println!("Added task to queue.");
             println!("Task Queue: {:?}", &config_lock.task_queue);
 
             let reply = json_reply(&n.clone().information);
@@ -146,8 +133,6 @@ async fn create_dns_records(
     ip: &String,
     proxied: bool
 ) -> Result<CloudflareDNSRecordCreate, StatusCode> {
-    println!("Creating DNS Record.");
-
     let response = match client.post("https://api.cloudflare.com/client/v4/zones/ebb52f1687a35641237774c39391ba2a/dns_records")
         .body(format!("
         {{
@@ -214,7 +199,6 @@ async fn create_certificates(
         .header("Authorization", format!("Bearer {}", cloudflare_key))
         .send().await {
             Ok(response) => {
-                // println!("{:?}", response.text().await);
                 let r = response.json::<CloudflareReturn>().await;
 
                 match r {

@@ -50,8 +50,6 @@ async fn main() {
                 // Execution can proceed, do so...
                 if let Some(current_task) = task_queue_lock.pop_front() {
                     if Utc::now().timestamp_millis() as u128 >= current_task.exec_at {
-                        println!("[task-runner]: Executing Task: {:#?}", current_task.task_type);
-
                         match current_task.task_type {
                             // We want to run a routing check to verify if the server is online/offline. If normal, queue a new check task 
                             models::TaskType::CheckStatus(tries) => {
@@ -70,8 +68,6 @@ async fn main() {
 
                                     return;
                                 }
-
-                                println!("[task]: CheckStatus->Start");
 
                                 let node = {
                                     let stack_lock = config_lock.instance_stack.lock().await;
@@ -93,8 +89,6 @@ async fn main() {
                                         },
                                     }.clone()
                                 };
-
-                                println!("[task]: CheckStatus->Retrieved Node");
 
                                 let request_url = format!("https://{}.reseda.app/health", node.information.id);
 
@@ -123,8 +117,6 @@ async fn main() {
                                     },
                                     None => {},
                                 };
-
-                                println!("[task]: CheckStatus->Finished");
 
                                 // Add another task for the same delay
                                 let exec_time = Utc::now().timestamp_millis() as u128 + Duration::new(1, 0).as_millis();
