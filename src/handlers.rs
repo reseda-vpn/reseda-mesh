@@ -57,7 +57,7 @@ pub async fn register_server(
                 println!("[location]: {:?}", &location);
                 println!("[key]: {}", &cloudflare_key);
             
-                let identifier = format!("{}-{}", &location.country.to_lowercase(), id.to_string());
+                let identifier = format!("{}-{}", &location.country.to_lowercase().replace(" ", "-"), id.to_string());
     
                 let record = match create_dns_records(&cloudflare_key, &client, &identifier, &ip, true).await {
                     Ok(val) => val,
