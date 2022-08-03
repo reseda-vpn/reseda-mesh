@@ -12,13 +12,11 @@ pub struct Server {
 #[derive(Deserialize, Debug, Serialize, Clone)]
 pub struct IpResponse {
     pub country: String,
+    pub countryCode: String,
     pub region: String,
-    pub eu: bool,
     pub city: String,
-    pub latitude: c_float,
-    pub longitude: c_float,
-    pub metro: i16,
-    pub radius: i16,
+    pub lat: c_float,
+    pub lon: c_float,
     pub timezone: String
 }
 
