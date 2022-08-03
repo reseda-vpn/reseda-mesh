@@ -46,9 +46,6 @@ pub async fn register_server(
                 configuration.lock().await.instance_stack.lock().await.get_mut(&ip).cloned()
             },
             false => {
-                println!("[mutex]: Obtaining Client Lock...");
-                println!("[mutex]: Obtained Lock on Client.");
-    
                 let id = Uuid::new_v4();
                 let location = match get_location(&client, &ip).await {
                     Ok(val) => val,
@@ -56,6 +53,9 @@ pub async fn register_server(
                         return Ok(Box::new(err))
                     }
                 };
+
+                println!("[location]: {:?}", &location);
+                println!("[key]: {}", &cloudflare_key);
             
                 let identifier = format!("{}-{}", &location.country.to_lowercase(), id.to_string());
     
