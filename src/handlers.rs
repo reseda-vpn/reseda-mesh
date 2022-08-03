@@ -228,7 +228,7 @@ async fn get_location(
     client: &Client,
     ip: &String
 ) -> Result<IpResponse, StatusCode> {
-    let data = match client.get(format!("https://ipgeolocationapi.co/v1/{}", ip))
+    let data = match client.get(format!("http://ip-api.com/json/{}", ip))
         .send().await {
             Ok(data) => data,
             Err(_) => {
