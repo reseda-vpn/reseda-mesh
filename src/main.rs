@@ -435,8 +435,6 @@ async fn main() {
                             }
                         }
                     }else {
-                        // println!("[task-runner]: Pretimed Task. Placing at the end of the queue");
-    
                         // If task cannot be completed, push it to the back of the queue and try process the next one.
                         // This intends to maximize priority tasks by ensuring they are processed first, and that delayed tasks are processed as intended.
                         task_queue_lock.push_back(current_task);
@@ -471,10 +469,8 @@ async fn main() {
                 }
             }).await {
                 Ok(_val) => {
-                    // println!("[task-runner]: Returned {:?}", val)
                 },
                 Err(_err) => {
-                    // println!("[task-runner]: Returned Error Value {:?}", err)
                 },
             };
         }
