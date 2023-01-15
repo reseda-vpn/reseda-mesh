@@ -215,7 +215,7 @@ async fn main() {
                                 // Match the SQLx response for publicizing the server
                                 let result = match config_lock.pool.begin().await {
                                     Ok(mut transaction) => {
-                                        match sqlx::query!("insert into Server (id, location, country, hostname, flag) values (?, ?, ?, ?, ?)", node.information.id, node.information.res.timezone, node.information.res.timezone.split("/").collect::<Vec<&str>>()[1], node.information.ip, node.information.res.country.to_lowercase().replace(" ", "-"))
+                                        match sqlx::query!("insert into Server (id, ip, location, country, hostname, flag) values (?, ?, ?, ?, ?, ?)", node.information.id, node.information.ip, node.information.res.timezone, node.information.res.timezone.split("/").collect::<Vec<&str>>()[1], node.information.ip, node.information.res.country.to_lowercase().replace(" ", "-"))
                                             .execute(&mut transaction)
                                             .await {
                                                 Ok(result) => {
