@@ -85,7 +85,7 @@ impl MeshState {
             .header("Authorization", format!("Bearer {}", config.cloudflare_key))
             .send().await {
                 Ok(response) => {
-                    println!("{:?}", response.text().await);
+                    // println!("{:?}", response.text().await);
                     let r = response.json::<CloudflareReturn>().await;
 
                     match r {
